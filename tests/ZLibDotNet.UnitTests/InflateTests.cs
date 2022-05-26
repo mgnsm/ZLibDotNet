@@ -2,6 +2,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Linq;
 using System;
 using System.Text;
+using System.IO;
 
 namespace ZLibDotNet.UnitTests;
 
@@ -276,5 +277,61 @@ public class InflateTests
         for (int i = 0; i < OutputOffset; i++)
             Assert.AreEqual(default, outputBuffer[i]);
         Assert.AreEqual(104, outputBuffer[OutputOffset]);
+    }
+
+    [TestMethod]
+    public void InflateInChunks()
+    {
+        const ushort ChunkSize = 16384;
+        byte[] @in = new byte[ChunkSize];
+        byte[] @out = new byte[ChunkSize];
+
+        ZLib zlib = new();
+        ZStream zStream = new();
+        Assert.AreEqual(Z_OK, zlib.InflateInit(zStream));
+
+        const int SourceSize = 60_000;
+        byte[] sourceBuffer = new byte[SourceSize];
+
+        using MemoryStream source = new(DeflateTests.DeflateBytesInChunks(sourceBuffer));
+        using MemoryStream dest = new();
+
+        int ret = Z_OK, have;
+        // decompress until deflate stream ends or end of stream
+        do
+        {
+            zStream.Input = @in;
+            zStream.AvailableIn = source.Read(@in, 0, ChunkSize);
+            if (zStream.AvailableIn == 0)
+                break;
+
+            // run Inflate on input until output buffer not full
+            do
+            {
+                zStream.Output = @out;
+                zStream.AvailableOut = ChunkSize;
+                ret = zlib.Inflate(zStream, Z_NO_FLUSH);
+                Assert.AreNotEqual(Z_STREAM_ERROR, ret); // state not clobbered
+                switch (ret)
+                {
+                    case Z_NEED_DICT:
+                        ret = Z_DATA_ERROR; // and fall through
+                        goto case Z_DATA_ERROR;
+                    case Z_DATA_ERROR:
+                    case Z_MEM_ERROR:
+                        _ = zlib.InflateEnd(zStream);
+                        Assert.Fail($"{ret}");
+                        return;
+                }
+                have = ChunkSize - zStream.AvailableOut;
+                dest.Write(@out, 0, have);
+            } while (zStream.AvailableOut == 0);
+            // done when Inflate says it's done
+        } while (ret != Z_STREAM_END);
+
+        // clean up
+        _ = zlib.InflateEnd(zStream);
+        Assert.AreEqual(Z_STREAM_END, ret);
+        Assert.IsTrue(Enumerable.SequenceEqual(sourceBuffer, dest.ToArray()));
     }
 }

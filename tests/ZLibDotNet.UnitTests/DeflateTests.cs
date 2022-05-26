@@ -1,5 +1,6 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.IO;
 using System.Linq;
 using System.Text;
 
@@ -295,5 +296,56 @@ public class DeflateTests
         Assert.AreEqual(Z_OK, zlib.DeflateEnd(zStream));
 
         Assert.AreEqual(Z_STREAM_ERROR, zlib.DeflateSetDictionary(zStream, default));
+    }
+
+    [TestMethod]
+    public void DeflateInChunks()
+    {
+        const int SourceSize = 60_000;
+        byte[] sourceBuffer = new byte[SourceSize];
+        _ = DeflateBytesInChunks(sourceBuffer);
+    }
+
+    internal static byte[] DeflateBytesInChunks(byte[] sourceBuffer)
+    {
+        const ushort ChunkSize = 16384;
+        byte[] @in = new byte[ChunkSize];
+        byte[] @out = new byte[ChunkSize];
+
+        ZLib zlib = new();
+        ZStream zStream = new();
+        Assert.AreEqual(Z_OK, zlib.DeflateInit(zStream, Z_DEFAULT_COMPRESSION));
+
+        using MemoryStream source = new(sourceBuffer);
+        using MemoryStream dest = new();
+
+        int ret, flush, have;
+        int bytesRead = 0;
+        // compress until end of stream
+        do
+        {
+            zStream.Input = @in;
+            zStream.AvailableIn = source.Read(@in, 0, ChunkSize);
+            bytesRead += zStream.AvailableIn;
+            flush = bytesRead >= sourceBuffer.Length ? Z_FINISH : Z_NO_FLUSH;
+
+            // run Deflate() on input until output buffer not full, finish compression if all of source has been read in
+            do
+            {
+                zStream.Output = @out;
+                zStream.AvailableOut = ChunkSize;
+                ret = zlib.Deflate(zStream, flush); // no bad return value
+                Assert.AreNotEqual(Z_STREAM_ERROR, ret); // state not clobbered
+                have = ChunkSize - zStream.AvailableOut;
+                dest.Write(@out, 0, have);
+            } while (zStream.AvailableOut == 0);
+            Assert.AreEqual(0, zStream.AvailableIn); // all input will be used
+        } while (flush != Z_FINISH);
+        Assert.AreEqual(Z_STREAM_END, ret); // stream will be complete
+
+        // clean up
+        Assert.AreEqual(Z_OK, zlib.DeflateEnd(zStream));
+
+        return dest.ToArray();
     }
 }
