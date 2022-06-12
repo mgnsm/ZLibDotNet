@@ -1,6 +1,8 @@
 ﻿// Original code and comments Copyright (C) 1995-2022 Mark Adler
 // Managed C#/.NET code Copyright (C) 2022 Magnus Montin
 
+using System.Buffers;
+
 namespace ZLibDotNet.Inflate;
 
 internal static partial class Inflater
@@ -39,7 +41,10 @@ internal static partial class Inflater
         if (windowBits != 0 && (windowBits < 8 || windowBits > 15))
             return Z_STREAM_ERROR;
         if (state.window != null && state.wbits != (uint)windowBits)
+        {
+            ArrayPool<byte>.Shared.Return(state.window);
             state.window = null;
+        }
 
         // update state and reset the rest of it
         state.wrap = wrap;

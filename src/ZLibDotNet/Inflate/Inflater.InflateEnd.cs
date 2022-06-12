@@ -10,6 +10,7 @@ internal static partial class Inflater
         if (InflateStateCheck(strm))
             return Z_STREAM_ERROR;
 
+        s_objectPool.Return(strm.inflateState);
         strm.inflateState = null;
         Trace.Tracev("inflate: end\n");
         return Z_OK;

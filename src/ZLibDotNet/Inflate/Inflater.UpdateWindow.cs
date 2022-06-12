@@ -2,6 +2,7 @@
 // Managed C#/.NET code Copyright (C) 2022 Magnus Montin
 
 using System;
+using System.Buffers;
 
 namespace ZLibDotNet.Inflate;
 
@@ -13,7 +14,7 @@ internal static partial class Inflater
 
         // if it hasn't been done already, allocate space for the window
         if (state.window == null)
-            state.window = new byte[1 << (int)state.wbits];
+            state.window = ArrayPool<byte>.Shared.Rent(1 << (int)state.wbits);
 
         // if window not in use yet, initialize
         if (state.wsize == 0)

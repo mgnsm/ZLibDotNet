@@ -7,6 +7,8 @@ namespace ZLibDotNet.Inflate;
 
 internal static partial class Inflater
 {
+    private static readonly ObjectPool<InflateState> s_objectPool = new();
+
     internal static int InflateInit(Unsafe.ZStream strm, int windowBits)
     {
         if (strm == null)
@@ -16,7 +18,7 @@ internal static partial class Inflater
         InflateState state;
         try
         {
-            state = new();
+            state = s_objectPool.Get();
         }
         catch (OutOfMemoryException)
         {
@@ -25,12 +27,14 @@ internal static partial class Inflater
         Trace.Tracev("inflate: allocated\n");
         strm.inflateState = state;
         state.strm = strm;
-        state.window = null;
         state.mode = InflateMode.Head;
 
         int ret = InflateReset(strm, windowBits);
         if (ret != Z_OK)
+        {
+            s_objectPool.Return(state);
             strm.inflateState = null;
+        }
         return ret;
     }
 }
