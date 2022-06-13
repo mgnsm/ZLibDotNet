@@ -348,4 +348,23 @@ public class DeflateTests
 
         return dest.ToArray();
     }
+
+    [TestMethod]
+    public void RawDeflateWithoutHeader()
+    {
+        ZLib zlib = new();
+        byte[] compr = new byte[13];
+        ZStream zStream = new()
+        {
+            Input = s_hello,
+            Output = compr
+        };
+        Assert.AreEqual(Z_OK, zlib.DeflateInit(zStream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY));
+        Assert.AreEqual(Z_OK, zlib.Deflate(zStream, Z_FINISH));
+        Assert.AreEqual(Z_OK, zlib.DeflateEnd(zStream));
+        Assert.AreEqual(13, zStream.TotalOut);
+
+        Assert.IsTrue(Enumerable.SequenceEqual(compr.Take(zStream.TotalOut),
+            new byte[13] { 203, 72, 205, 201, 201, 215, 81, 200, 0, 81, 138, 12, 0 }));
+    }
 }

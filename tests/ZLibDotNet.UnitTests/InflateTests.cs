@@ -334,4 +334,23 @@ public class InflateTests
         Assert.AreEqual(Z_STREAM_END, ret);
         Assert.IsTrue(Enumerable.SequenceEqual(sourceBuffer, dest.ToArray()));
     }
+
+    [TestMethod]
+    public void RawInflateWithoutHeader()
+    {
+        ZLib zlib = new();
+        byte[] compr = new byte[12] { 203, 72, 205, 201, 201, 215, 81, 200, 0, 81, 138, 0 };
+        byte[] uncompr = new byte[13];
+        ZStream zStream = new()
+        {
+            Input = compr,
+            Output = uncompr
+        };
+        Assert.AreEqual(Z_OK, zlib.InflateInit(zStream, -15));
+        Assert.AreEqual(Z_STREAM_END, zlib.Inflate(zStream, Z_FINISH));
+        Assert.AreEqual(Z_OK, zlib.InflateEnd(zStream));
+        Assert.AreEqual(13, zStream.TotalOut);
+
+        Assert.IsTrue(Enumerable.SequenceEqual(uncompr, s_hello));
+    }
 }

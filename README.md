@@ -148,9 +148,11 @@ Below is an exhaustive list of the functions and macros in the zlib compression 
 | C function/macro  | C# API | Unsafe C# API |
 | --- | --- | --- |
 | `int deflateInit(z_streamp strm, int level)` | `int DeflateInit(ZStream strm, int level)` | `int DeflateInit(Unsafe.ZStream strm, int level)` |
+| `int deflateInit2(z_streamp strm, int level, int method, int windowBits, int memLevel, int strategy)` | `int DeflateInit(ZStream strm, int level, int method, int windowBits, int memLevel, int strategy)` | `int DeflateInit(Unsafe.ZStream strm, int level, int method, int windowBits, int memLevel, int strategy)` |
 | `int deflate(z_streamp strm, int flush)` | `int Deflate(ZStream strm, int flush)` | `int Deflate(Unsafe.ZStream strm, int flush)` |
 | `int deflateEnd (z_streamp strm)` | `int DeflateEnd(ZStream strm)` | `int DeflateEnd(Unsafe.ZStream strm)` |
 | `int inflateInit (z_streamp strm)` | `int InflateInit(ZStream strm)` | `int InflateInit(Unsafe.ZStream strm)` |
+| `int inflateInit2 (z_streamp strm, int windowBits)` | `int InflateInit(ZStream strm, int windowBits)` | `int InflateInit(Unsafe.ZStream strm, int windowBits)` |
 | `int inflate (z_streamp strm, int flush)` | `int Inflate(ZStream strm, int flush)` | `int Inflate(Unsafe.ZStream strm, int flush)` |
 | `int inflateEnd (z_streamp strm)` | `int InflateEnd(ZStream strm)` | `int InflateEnd(ZStream strm)` |
 | `int deflateSetDictionary (z_streamp strm, const Bytef* dictionary, uInt dictLength)` | `int DeflateSetDictionary(ZStream strm, byte[] dictionary)` | `int DeflateSetDictionary(Unsafe.ZStream strm, byte* dictionary, uint dictLength)` |

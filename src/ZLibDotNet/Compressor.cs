@@ -16,7 +16,7 @@ internal static class Compressor
         *destLen = 0;
 
         Unsafe.ZStream stream = new();
-        int err = Deflater.DeflateInit(stream, level, MaxWindowBits);
+        int err = Deflater.DeflateInit(stream, level);
         if (err != Z_OK)
             return err;
 

@@ -8,12 +8,14 @@ namespace ZLibDotNet.Deflate;
 
 internal static partial class Deflater
 {
+    private const int DefaultMemLevel = 8;
     private static readonly ObjectPool<DeflateState> s_objectPool = new();
 
-    internal static int DeflateInit(Unsafe.ZStream strm, int level, int windowBits)
+    internal static int DeflateInit(Unsafe.ZStream strm, int level) =>
+        DeflateInit(strm, level, Z_DEFLATED, MaxWindowBits, DefaultMemLevel, Z_DEFAULT_STRATEGY);
+
+    internal static int DeflateInit(Unsafe.ZStream strm, int level, int method, int windowBits, int memLevel, int strategy)
     {
-        const int ZDeflated = 8; // The deflate compression method (the only one supported)
-        const int DefMemLevel = 8;
         const int MaxMemLevel = 9;
         const int MinMatch = 3;
 
@@ -32,11 +34,11 @@ internal static partial class Deflater
             windowBits = -windowBits;
         }
 
-        const int Method = ZDeflated;
-        const int MemLevel = DefMemLevel;
-        const int Strategy = Z_DEFAULT_STRATEGY;
-        if (MemLevel < 1 || MemLevel > MaxMemLevel || windowBits < 8
-            || windowBits > 15 || level < 0 || level > 9 || Strategy < 0 || Strategy > Z_FIXED
+        if (memLevel < 1 || memLevel > MaxMemLevel
+            || method != Z_DEFLATED
+            || windowBits < 8 || windowBits > 15
+            || level < 0 || level > 9
+            || strategy < 0 || strategy > Z_FIXED
             || windowBits == 8 && wrap != 1)
             return Z_STREAM_ERROR;
 
@@ -56,7 +58,7 @@ internal static partial class Deflater
             s.w_size = (uint)(1 << windowBits);
             s.w_mask = s.w_size - 1;
 
-            int hash_bits = MemLevel + 7;
+            int hash_bits = memLevel + 7;
             s.hash_bits = (uint)hash_bits;
             s.hash_size = (uint)(1 << hash_bits);
             s.hash_mask = s.hash_size - 1;
@@ -69,7 +71,7 @@ internal static partial class Deflater
 
             s.high_water = 0; // nothing written to s.window yet
 
-            s.lit_bufsize = 1 << (MemLevel + 6); // 16K elements by default
+            s.lit_bufsize = (uint)(1 << (memLevel + 6)); // 16K elements by default
 
             s.pending_buf_size = s.lit_bufsize * 4;
             s.pendingManagedBuffer = ArrayPool<byte>.Shared.Rent((int)s.pending_buf_size);
@@ -102,8 +104,8 @@ internal static partial class Deflater
         }
 
         s.level = level;
-        s.strategy = Strategy;
-        s.method = Method;
+        s.strategy = strategy;
+        s.method = (byte)method;
 
         return DeflateReset(strm);
     }

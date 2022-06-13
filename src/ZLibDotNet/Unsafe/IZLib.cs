@@ -19,6 +19,19 @@ public interface IZLib
     int DeflateInit(ZStream strm, int level);
 
     /// <summary>
+    /// Initializes the internal stream state for compression.
+    /// </summary>
+    /// <param name="strm">The stream to be initialized for compression.</param>
+    /// <param name="level">The compression level. It must be <see cref="Z_DEFAULT_COMPRESSION" />, or between 0 and 9: 1 gives best speed, 9 gives best compression, 0 gives no compression at all (the input data is simply copied a block at a time). <see cref="Z_DEFAULT_COMPRESSION" /> requests a default compromise between speed and compression (equivalent to level 6).</param>
+    /// <param name="method">The compression method. It must be <see cref="Z_DEFLATED"/>.</param>
+    /// <param name="windowBits">The base two logarithm of the window size (the size of the history buffer). It should be in the range 8..15 or -8..-15 for raw deflate. Larger values of this parameter result in better compression at the expense of memory usage. The default value is 15 if the <see cref="DeflateInit(ZStream, int)"/> overload is used instead.</param>
+    /// <param name="memLevel">Specifies how much memory should be allocated for the internal compression state. <paramref name="memLevel"/>=1 uses minimum memory but is slow and reduces compression ratio; <paramref name="memLevel"/>=9 uses maximum memory for optimal speed. The default value is 8.</param>
+    /// <param name="strategy">Used to tune the compression algorithm. Use the value <see cref="Z_DEFAULT_STRATEGY"/> for normal data, <see cref="Z_FILTERED"/> for data produced by a filter(or predictor), <see cref="Z_HUFFMAN_ONLY"/> to force Huffman encoding only (no string match), or <see cref="Z_RLE"/> to limit match distances to one (run-length encoding).</param>
+    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, or <see cref="Z_STREAM_ERROR"/> if any parameter is invalid (such as an invalid method).</returns>
+    /// <remarks>This method does not perform any compression. Actual compression will be done by <see cref="Deflate(ZStream, int)"/>.</remarks>
+    int DeflateInit(ZStream strm, int level, int method, int windowBits, int memLevel, int strategy);
+
+    /// <summary>
     /// Compresses as much data as possible, and stops when the input buffer becomes empty or the output buffer becomes full. It may introduce some output latency(reading input without producing any output) except when forced to flush.
     /// <para>The detailed semantics are as follows. The method performs one or both of the following actions:</para>
     /// <list type="bullet"><item><description>Compress more input starting at <see cref="ZStream.NextIn"/> and update <see cref="ZStream.NextIn"/> and <see cref="ZStream.AvailableIn"/> of <paramref name="strm"/> accordingly. If not all input can be processed (because there is not enough room in the output buffer), the <see cref="ZStream.NextIn"/> and <see cref="ZStream.AvailableIn"/> properties of <paramref name="strm"/> are updated and processing will resume at this point for the next call of the same method.</description></item>
@@ -45,6 +58,15 @@ public interface IZLib
     /// <returns><see cref="Z_OK"/> on success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, or <see cref="Z_STREAM_ERROR"/> if <paramref name="strm"/> is <see langword="null"/>.</returns>
     /// <remarks>This method does not perform any decompression. Actual decompression will be done by <see cref="Inflate(ZStream, int)"/>.</remarks>
     int InflateInit(ZStream strm);
+
+    /// <summary>
+    /// Initializes the internal stream state for decompression.
+    /// </summary>
+    /// <param name="strm">The stream to be initialized for decompression.</param>
+    /// <param name="windowBits">The base two logarithm of the window size (the size of the history buffer). It should be in the range 8..15 or -8..-15 for raw deflate. Larger values of this parameter result in better compression at the expense of memory usage. The default value is 15 if the <see cref="InflateInit(ZStream)"/> overload is used instead.</param>
+    /// <returns><see cref="Z_OK"/> on success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, or <see cref="Z_STREAM_ERROR"/> if the parameters are invalid, such as <paramref name="strm"/> being <see langword="null"/>.</returns>
+    /// <remarks>This method does not perform any decompression apart from possibly reading the zlib header if present: actual decompression will be done by <see cref="Inflate(ZStream, int)"/>.</remarks>
+    int InflateInit(ZStream strm, int windowBits);
 
     /// <summary>
     /// Decompresses as much data as possible, and stops when the input buffer becomes empty or the output buffer becomes full. It may introduce some output latency (reading input without producing any output) except when forced to flush.
