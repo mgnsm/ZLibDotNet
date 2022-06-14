@@ -8,7 +8,7 @@ namespace ZLibDotNet.Inflate;
 /// </summary>
 internal unsafe class InflateState
 {
-    private const ushort Enough = Inflater.EnoughLens + Inflater.EnoughDists;
+    internal const ushort Enough = Inflater.EnoughLens + Inflater.EnoughDists;
 
     internal Unsafe.ZStream strm;   // reference back to this zlib stream
     internal InflateMode mode;      // current inflate mode

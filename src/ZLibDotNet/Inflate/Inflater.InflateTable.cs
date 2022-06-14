@@ -27,7 +27,7 @@ internal static partial class Inflater
         23, 23, 24, 24, 25, 25, 26, 26, 27, 27,
         28, 28, 29, 29, 64, 64 };
 
-    private static unsafe int InflateTable(CodeType type, ushort* lens, uint codes, ref Code* table, ref uint bits, ushort* work)
+    internal static unsafe int InflateTable(CodeType type, ushort* lens, uint codes, ref Code* table, ref uint bits, ushort* work)
     {
         uint len;               // a code's length in bits
         uint sym;               // index of code symbols

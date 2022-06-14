@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Linq;
+﻿using System.Linq;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -33,7 +32,7 @@ public class ExampleTests
         _ = zlib.InflateInit(zStream);
         _ = zlib.Inflate(zStream, Z_SYNC_FLUSH);
 
-        Debug.Assert(Enumerable.SequenceEqual(s_inputData, uncomressedData));
+        Assert.IsTrue(Enumerable.SequenceEqual(s_inputData, uncomressedData));
     }
 
     [TestMethod]
@@ -70,7 +69,7 @@ public class ExampleTests
                     _ = zlib.Inflate(zStream, Z_SYNC_FLUSH);
                 }
 
-                Debug.Assert(Enumerable.SequenceEqual(s_inputData, uncompressedData));
+                Assert.IsTrue(Enumerable.SequenceEqual(s_inputData, uncompressedData));
             }
         }
     }

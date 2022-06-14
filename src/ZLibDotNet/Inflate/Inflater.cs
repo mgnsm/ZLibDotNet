@@ -145,7 +145,6 @@ internal static partial class Inflater
                             state.mode = InflateMode.Bad;
                             break;
                         }
-                        const uint Z_DEFLATED = 8;
                         if (x.Bits(4) != Z_DEFLATED)
                         {
                             strm.msg = "unknown compression method";
@@ -280,6 +279,12 @@ internal static partial class Inflater
                         x.DropBits(5);
                         state.ncode = x.Bits(4) + 4;
                         x.DropBits(4);
+                        if (state.nlen > 286 || state.ndist > 30)
+                        {
+                            strm.msg = "too many length or distance symbols";
+                            state.mode = InflateMode.Bad;
+                            break;
+                        }
                         Trace.Tracev("inflate:       table sizes ok\n");
                         state.have = 0;
                         state.mode = InflateMode.LenLens;
