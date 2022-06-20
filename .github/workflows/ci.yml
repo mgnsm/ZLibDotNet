@@ -24,11 +24,21 @@ jobs:
       with:
         dotnet-version: 6.0.x
 
-    - name: Build
+    - name: Build (.NET 6)
       run: |
         dotnet build src/ZLibDotNet/ZLibDotNet.csproj -c Release -f netstandard1.3
         dotnet build tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net6.0
 
-    - name: Test
+    - name: Build (.NET Framework 4.6.2)
+      if: ${{ matrix.os == 'windows-latest' }}
+      run: |
+        dotnet build tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net462
+
+    - name: Test (.NET 6)
       run: |
         dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net6.0 --no-build --no-restore
+
+    - name: Test (.NET Framework 4.6.2)
+      if: ${{ matrix.os == 'windows-latest' }}
+      run: |
+        dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net462 --no-build --no-restore
