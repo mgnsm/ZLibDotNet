@@ -1,4 +1,6 @@
 # ZLibDotNet
+![Build Status](https://github.com/mgnsm/ZLibDotNet/actions/workflows/ci.yml/badge.svg)
+
 A fully managed C#/.NET Standard 1.3 implementation of the compression (deflate) and decompression (inflate) functions in the [zlib compression library](https://www.zlib.net/), including both unsafe (operations involving pointers) and type-safe APIs for doing in-memory compression, decompression and integrity checks of uncompressed data in the zlib format.
 
 ### Data format

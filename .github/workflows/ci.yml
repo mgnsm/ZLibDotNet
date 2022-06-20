@@ -1,4 +1,4 @@
-name: ZLibDotNet CI
+name: macOS/Ubuntu/Windows
 
 on:
   push:
