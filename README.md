@@ -1,10 +1,10 @@
 # ZLibDotNet
 ![Build Status](https://github.com/mgnsm/ZLibDotNet/actions/workflows/ci.yml/badge.svg)
+[![NuGet Badge](https://img.shields.io/nuget/v/ZLibDotNet.svg)](https://www.nuget.org/packages/ZLibDotNet/)
 
-A fully managed C#/.NET Standard 1.3 implementation of the compression (deflate) and decompression (inflate) functions in the [zlib compression library](https://www.zlib.net/), including both unsafe (operations involving pointers) and type-safe APIs for doing in-memory compression, decompression and integrity checks of uncompressed data in the zlib format.
+A fully managed and [performant](tests/ZLibDotNet.Benchmarks) C#/.NET Standard 1.3 implementation of the [zlib compression library](https://www.zlib.net/), including both unsafe (operations involving pointers) and type-safe APIs for doing in-memory compression, decompression, and integrity checks of uncompressed data.
 
-### Data format
-The zlib data format, documented in [RFC (Request for Comments) 1950](https://datatracker.ietf.org/doc/html/rfc1950), wraps a raw deflate stream of data, which is itself documented in [RFC 1951](https://datatracker.ietf.org/doc/html/rfc1951), in a compact header and trailer of just two and four bytes respectively. It was designed for in-memory and communication channel applications and is different from the gzip or zip formats, neither of which are supported by this implementation.
+Supports the zlib ([RFC (Request for Comments) 1950](https://datatracker.ietf.org/doc/html/rfc1950)) and raw deflate ([RFC 1951](https://datatracker.ietf.org/doc/html/rfc1951)) data formats but not the gzip or zip formats.
 
 ## zlib support in .NET
 If you simply want to compress or decompress data in the zlib format in a .NET application, there is a `ZLibStream` class for doing this in .NET 6:
@@ -33,7 +33,7 @@ There are indeed other third-party and fully managed C#/.NET libraries that alre
 
 It has been designed to provide an API surface that is very similar to the one that the original ported C library provides. This includes the ability to use pointers to data to be compressed or uncompressed, which comes in handy when you for example consume data from a socket frequently and want to minimze the amount of memory heap allocations your application performs.
 ## Installation
-ZLibDotNet is installed using NuGet:
+ZLibDotNet is preferably installed using NuGet:
 
     PM> Install-Package ZLibDotNet
 ## Example
@@ -163,7 +163,7 @@ Below is an exhaustive list of the functions and macros in the zlib compression 
 | `int inflateSync (z_streamp strm)` | `int InflateSync(ZStream strm)` | `int InflateSync(Unsafe.ZStream strm)` |
 | `int inflateReset (z_streamp strm)` | `int InflateReset(ZStream strm)` | `int InflateReset(Unsafe.ZStream strm)` |
 | `int inflateReset2 (z_streamp strm, int windowBits)` | `int InflateReset(ZStream strm, int windowBits)` | `int InflateReset(Unsafe.ZStream strm, int windowBits)` |
-| `int inflatePrime (z_streamp strm, int bits, int value)` | `int InflatePrime (ZStream strm, int bits, int value)` | `int InflatePrime (Unsafe.ZStream strm, int bits, int value)|
+| `int inflatePrime (z_streamp strm, int bits, int value)` | `int InflatePrime (ZStream strm, int bits, int value)` | `int InflatePrime (Unsafe.ZStream strm, int bits, int value)`|
 | `int compress (Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen)` | `int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen)` | `int Compress(byte* dest, uint* destLen, byte* source, uint sourceLen)` |
 | `int compress2 (Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen, int level)` | `int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen, int level)` | `int Compress(byte* dest, uint* destLen, byte* source, uint sourceLen, int level)` |
 | `int uncompress (Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen)` | `int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen)` | `int Uncompress(byte* dest, uint* destLen, byte* source, uint sourceLen)` |
