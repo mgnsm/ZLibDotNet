@@ -1,0 +1,91 @@
+name: Package and Release
+
+on:
+  push:
+    tags:
+     - 'v*'
+
+jobs:
+  Build:
+    strategy:
+      matrix:
+        os: [macOS-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Setup the .NET 6 SDK
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 6.0.x
+
+    - name: Get Version From Tag
+      id: version
+      shell: bash
+      run: |
+        version=${GITHUB_REF/refs\/tags\//} # = e.g. v0.1.0
+        parts=(${version//./ }) # Replace '.' with ' '
+        major=${parts[0]#*v} # Remove the "v" prefix
+        minor=${parts[1]}
+        patch=${parts[2]}
+        echo ::set-output name=version::$major.$minor.$patch
+
+    - name: Build (.NET 6)
+      shell: bash
+      run: |
+        version=${{ steps.version.outputs.version }}
+        dotnet build src/ZLibDotNet/ZLibDotNet.csproj -c Release -f netstandard1.3 -p:Version=$version -p:ContinuousIntegrationBuild=true
+        dotnet build tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net6.0 -p:Version=$version
+
+    - name: Build (.NET Framework 4.6.2)
+      if: ${{ matrix.os == 'windows-latest' }}
+      shell: bash
+      run: |
+        dotnet build tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net462 -p:Version=${{ steps.version.outputs.version }}
+
+    - name: Test (.NET 6)
+      run: |
+        dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net6.0 --no-build --no-restore
+
+    - name: Test (.NET Framework 4.6.2)
+      if: ${{ matrix.os == 'windows-latest' }}
+      run: |
+        dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net462 --no-build --no-restore
+
+    - name: Pack
+      if: ${{ matrix.os == 'windows-latest' }}
+      shell: bash
+      run: |
+        dotnet pack src/ZLibDotNet/ZLibDotNet.csproj -c Release /property:PackageVersion=${{ steps.version.outputs.version }} --no-build --no-restore --output packages
+
+    - name: Create Release
+      id: create_release
+      if: ${{ matrix.os == 'windows-latest' }}
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Version ${{ steps.version.outputs.version }}
+        draft: true
+        prerelease: false
+
+    - name: Upload Package
+      if: ${{ matrix.os == 'windows-latest' }}
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: packages/ZLibDotNet.${{ steps.version.outputs.version }}.nupkg
+        asset_name: ZLibDotNet.${{ steps.version.outputs.version }}.nupkg
+        asset_content_type: application/zip
+
+    - name: Upload Artifact
+      if: ${{ matrix.os == 'windows-latest' }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: ZLibDotNet
+        path: packages
+        if-no-files-found: error
