@@ -560,6 +560,14 @@ public partial class ZLib : IZLib, Unsafe.IZLib
     public unsafe int Compress(byte* dest, uint* destLen, byte* source, uint sourceLen, int level) => Compressor.Compress(dest, destLen, source, sourceLen, level);
 
     /// <summary>
+    /// Calculates an upper bound on the compressed size of a destination buffer.
+    /// </summary>
+    /// <param name="sourceLen">The number of bytes to be compressed.</param>
+    /// <returns>An upper bound on the compressed size after compressing <paramref name="sourceLen"/> bytes.</returns>
+    /// <remarks>It would be used before a <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out uint)"/>, <see cref="Compress(byte*, uint*, byte*, uint)"/>, <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out uint, int)"/> or <see cref="Compress(byte*, uint*, byte*, uint, int)"/> call to allocate the destination buffer.</remarks>
+    public uint CompressBound(uint sourceLen) => Compressor.CompressBound(sourceLen);
+
+    /// <summary>
     /// Decompresses the source buffer into the destination buffer.
     /// </summary>
     /// <param name="source">The source buffer.</param>

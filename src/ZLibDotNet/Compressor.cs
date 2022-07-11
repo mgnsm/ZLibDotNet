@@ -102,4 +102,8 @@ internal static class Compressor
                err == Z_BUF_ERROR && left + stream.avail_out != 0 ? Z_DATA_ERROR :
                err;
     }
+
+    internal static uint CompressBound(uint sourceLen) =>
+        sourceLen + (sourceLen >> 12) + (sourceLen >> 14) +
+           (sourceLen >> 25) + 13;
 }

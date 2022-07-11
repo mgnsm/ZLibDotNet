@@ -184,6 +184,14 @@ public interface IZLib
     unsafe int Compress(byte* dest, uint* destLen, byte* source, uint sourceLen, int level);
 
     /// <summary>
+    /// Calculates an upper bound on the compressed size of a destination buffer.
+    /// </summary>
+    /// <param name="sourceLen">The number of bytes to be compressed.</param>
+    /// <returns>An upper bound on the compressed size after compressing <paramref name="sourceLen"/> bytes.</returns>
+    /// <remarks>It would be used before a <see cref="Compress(byte*, uint*, byte*, uint)"/> or <see cref="Compress(byte*, uint*, byte*, uint, int)"/> call to allocate the destination buffer.</remarks>
+    uint CompressBound(uint sourceLen);
+
+    /// <summary>
     /// Decompresses the source buffer into the destination buffer.
     /// </summary>
     /// <param name="dest">A pointer to the destination buffer.</param>

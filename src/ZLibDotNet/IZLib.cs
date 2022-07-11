@@ -195,6 +195,14 @@ public interface IZLib
     int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen, int level);
 
     /// <summary>
+    /// Calculates an upper bound on the compressed size of a destination buffer.
+    /// </summary>
+    /// <param name="sourceLen">The number of bytes to be compressed.</param>
+    /// <returns>An upper bound on the compressed size after compressing <paramref name="sourceLen"/> bytes.</returns>
+    /// <remarks>It would be used before a <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out uint)"/> or <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out uint, int)"/> call to allocate the destination buffer.</remarks>
+    uint CompressBound(uint sourceLen);
+
+    /// <summary>
     /// Decompresses the source buffer into the destination buffer.
     /// </summary>
     /// <param name="source">The source buffer.</param>

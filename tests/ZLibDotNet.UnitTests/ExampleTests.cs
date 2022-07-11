@@ -7,20 +7,20 @@ namespace ZLibDotNet.UnitTests;
 [TestClass]
 public class ExampleTests
 {
-    private const int HeaderAndTrailerSize = 2 + 4;
     private static readonly byte[] s_inputData = Encoding.ASCII.GetBytes("hello, hello!");
 
     [TestMethod]
     public void SafeCompressAndUncompress()
     {
         // Compress
-        byte[] compressedData = new byte[s_inputData.Length + HeaderAndTrailerSize];
+        ZLib zlib = new();
+        uint sourceLen = zlib.CompressBound((uint)s_inputData.Length);
+        byte[] compressedData = new byte[sourceLen];
         ZStream zStream = new()
         {
             Input = s_inputData,
             Output = compressedData
         };
-        ZLib zlib = new();
         _ = zlib.DeflateInit(zStream, Z_DEFAULT_COMPRESSION);
         _ = zlib.Deflate(zStream, Z_FULL_FLUSH);
         _ = zlib.DeflateEnd(zStream);
@@ -38,10 +38,11 @@ public class ExampleTests
     [TestMethod]
     public void UnsafeCompressAndUncompress()
     {
-        byte[] compressedData = new byte[s_inputData.Length + HeaderAndTrailerSize];
+        ZLib zlib = new();
+        uint sourceLen = zlib.CompressBound((uint)s_inputData.Length);
+        byte[] compressedData = new byte[sourceLen];
         byte[] uncompressedData = new byte[s_inputData.Length];
 
-        ZLib zlib = new();
         unsafe
         {
             fixed (byte* input = s_inputData, compr = compressedData)
