@@ -4,6 +4,7 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using static ZLibDotNet.Deflate.Constants;
 
 namespace ZLibDotNet.Deflate;
@@ -319,7 +320,7 @@ internal static class Tree
         PutShort(s, (ushort)stored_len);
         PutShort(s, (ushort)~stored_len);
         if (buf != null && stored_len != 0)
-            Buffer.MemoryCopy(buf, s.pending_buf + s.pending, stored_len, stored_len);
+            netUnsafe.CopyBlock(ref MemoryMarshal.GetReference(s.pending_buf.AsSpan((int)s.pending)), ref netUnsafe.AsRef<byte>(buf), stored_len);
         s.pending += stored_len;
 #if DEBUG
         s.compressed_len = (s.compressed_len + 3 + 7) & unchecked((uint)~7);
@@ -834,9 +835,9 @@ internal static class Tree
     /// <returns><see langword="true"/> if the current block must be flushed.</returns>
     internal static unsafe bool Tally(DeflateState s, uint dist, uint lc)
     {
-        s.sym_buf[s.sym_next++] = (byte)dist;
-        s.sym_buf[s.sym_next++] = (byte)(dist >> 8);
-        s.sym_buf[s.sym_next++] = (byte)lc;
+        s.pending_buf[s.lit_bufsize + s.sym_next++] = (byte)dist;
+        s.pending_buf[s.lit_bufsize + s.sym_next++] = (byte)(dist >> 8);
+        s.pending_buf[s.lit_bufsize + s.sym_next++] = (byte)lc;
         if (dist == 0)
         {
             // lc is the unmatched char
@@ -869,49 +870,48 @@ internal static class Tree
             uint sx = 0;    // running index in sym_buf
             uint code;      // the code to send
             int extra;      // number of extra bits to send
-            unsafe
+
+            do
             {
-                do
+                dist = s.pending_buf[s.lit_bufsize + sx++] & 0xff;
+                dist += (s.pending_buf[s.lit_bufsize + sx++] & 0xff) << 8;
+                lc = s.pending_buf[s.lit_bufsize + sx++];
+                if (dist == 0)
                 {
-                    dist = s.sym_buf[sx++] & 0xff;
-                    dist += (s.sym_buf[sx++] & 0xff) << 8;
-                    lc = s.sym_buf[sx++];
-                    if (dist == 0)
-                    {
-                        SendCode(s, lc, ltree); // send a literal byte
+                    SendCode(s, lc, ltree); // send a literal byte
 #if DEBUG
-                        Trace.Tracecv(IsGraph(lc), $" '{lc}' ");
+                    Trace.Tracecv(IsGraph(lc), $" '{lc}' ");
 #endif
-                    }
-                    else
+                }
+                else
+                {
+                    // Here, lc is the match length - MIN_MATCH
+                    code = s_length_code[lc];
+                    SendCode(s, (int)(code + Literals + 1), ltree); // send the length code
+                    extra = s_extra_lbits[code];
+                    if (extra != 0)
                     {
-                        // Here, lc is the match length - MIN_MATCH
-                        code = s_length_code[lc];
-                        SendCode(s, (int)(code + Literals + 1), ltree); // send the length code
-                        extra = s_extra_lbits[code];
-                        if (extra != 0)
-                        {
-                            lc -= s_base_length[code];
-                            SendBits(s, lc, extra); // send the extra length bits
-                        }
-                        dist--; // dist is now the match distance - 1
-                        code = DCode((uint)dist);
-                        Debug.Assert(code < DCodes, "bad d_code");
+                        lc -= s_base_length[code];
+                        SendBits(s, lc, extra); // send the extra length bits
+                    }
+                    dist--; // dist is now the match distance - 1
+                    code = DCode((uint)dist);
+                    Debug.Assert(code < DCodes, "bad d_code");
 
-                        SendCode(s, (int)code, dtree); // send the distance code
-                        extra = s_extra_dbits[code];
-                        if (extra != 0)
-                        {
-                            dist -= s_base_dist[code];
-                            SendBits(s, dist, extra); // send the extra distance bits
-                        }
-                    } // literal or match pair ?
+                    SendCode(s, (int)code, dtree); // send the distance code
+                    extra = s_extra_dbits[code];
+                    if (extra != 0)
+                    {
+                        dist -= s_base_dist[code];
+                        SendBits(s, dist, extra); // send the extra distance bits
+                    }
+                } // literal or match pair ?
 
-                    // Check that the overlay between pending_buf and sym_buf is ok:
-                    Debug.Assert(s.pending < s.lit_bufsize + sx, "pendingBuf overflow");
+                // Check that the overlay between pending_buf and sym_buf is ok:
+                Debug.Assert(s.pending < s.lit_bufsize + sx, "pendingBuf overflow");
 
-                } while (sx < s.sym_next);
-            }
+            } while (sx < s.sym_next);
+
         }
 
         SendCode(s, EndBlock, ltree);

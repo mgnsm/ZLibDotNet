@@ -26,7 +26,7 @@ internal static partial class Deflater
 
         DeflateState s = strm.deflateState;
         s.pending = 0;
-        s.pendingOut = s.pendingManagedBuffer;
+        s.pending_out = s.pending_buf;
 
         if (s.wrap < 0)
             s.wrap = -s.wrap; // was made negative by deflate(..., Z_FINISH);

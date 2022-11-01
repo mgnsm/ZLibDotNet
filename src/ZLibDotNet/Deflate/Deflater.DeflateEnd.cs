@@ -21,8 +21,8 @@ internal static partial class Deflater
             ArrayPool<ushort>.Shared.Return(s.prev);
         if (s.head != default)
             ArrayPool<ushort>.Shared.Return(s.head);
-        if (s.pendingManagedBuffer != default)
-            ArrayPool<byte>.Shared.Return(s.pendingManagedBuffer);
+        if (s.pending_buf != default)
+            ArrayPool<byte>.Shared.Return(s.pending_buf);
 
         s_objectPool.Return(s);
         strm.deflateState = null;

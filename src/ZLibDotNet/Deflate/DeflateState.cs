@@ -5,20 +5,18 @@ using static ZLibDotNet.Deflate.Constants;
 
 namespace ZLibDotNet.Deflate;
 
-internal unsafe class DeflateState
+internal class DeflateState
 {
-    internal byte[] pendingManagedBuffer;
-    internal byte[] pendingOut;
     internal int pendingOutOffset;
 
     internal Unsafe.ZStream strm;   // pointer back to this zlib stream
     internal int status;            // as the name implies
-    internal byte* pending_buf;     // output still pending
+    internal byte[] pending_buf;    // output still pending
 
     internal uint pending_buf_size; // size of pending_buf
     internal int wrap;              // bit 0 true for zlib, bit 1 true for gzip
 
-    internal byte* pending_out;     // next pending byte to output to the stream
+    internal byte[] pending_out;    // next pending byte to output to the stream
 
     internal uint pending;          // nb of bytes in the pending buffer
 
@@ -109,8 +107,6 @@ internal unsafe class DeflateState
     internal int heap_max;                          // element of largest frequency
 
     internal byte[] depth = new byte[2 * LCodes + 1]; // Depth of each subtree used as tie breaker for trees of equal frequency
-
-    internal byte* sym_buf; // buffer for distances and literals/lengths
 
     internal uint lit_bufsize;
     /* Size of match buffer for literals/lengths.  There are 4 reasons for

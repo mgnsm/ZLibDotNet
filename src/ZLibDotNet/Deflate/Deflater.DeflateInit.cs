@@ -74,7 +74,7 @@ internal static partial class Deflater
             s.lit_bufsize = (uint)(1 << (memLevel + 6)); // 16K elements by default
 
             s.pending_buf_size = s.lit_bufsize * 4;
-            s.pendingManagedBuffer = ArrayPool<byte>.Shared.Rent((int)s.pending_buf_size);
+            s.pending_buf = ArrayPool<byte>.Shared.Rent((int)s.pending_buf_size);
         }
         catch (OutOfMemoryException)
         {
@@ -94,8 +94,8 @@ internal static partial class Deflater
                     ArrayPool<ushort>.Shared.Return(s.prev);
                 if (s.head != default)
                     ArrayPool<ushort>.Shared.Return(s.head);
-                if (s.pendingManagedBuffer != default)
-                    ArrayPool<byte>.Shared.Return(s.pendingManagedBuffer);
+                if (s.pending_buf != default)
+                    ArrayPool<byte>.Shared.Return(s.pending_buf);
 
                 s_objectPool.Return(s);
             }

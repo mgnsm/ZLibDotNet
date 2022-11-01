@@ -4,6 +4,7 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using static ZLibDotNet.Deflate.Constants;
 
 namespace ZLibDotNet.Deflate;
@@ -75,157 +76,152 @@ internal static partial class Deflater
         int old_flush = s.last_flush; // value of flush param for previous deflate call
         s.last_flush = flush;
 
-        fixed (byte* pending_buf = s.pendingManagedBuffer, pending_out = s.pendingOut)
-        {
-            s.pending_buf = pending_buf;
-            s.pending_out = pending_out + s.pendingOutOffset;
-            s.sym_buf = pending_buf + s.lit_bufsize;
-            s.sym_end = (s.lit_bufsize - 1) * 3;
+        s.sym_end = (s.lit_bufsize - 1) * 3;
 
-            // Flush as much pending output as possible
+        // Flush as much pending output as possible
+        if (s.pending != 0)
+        {
+            FlushPending(strm);
+            if (strm.avail_out == 0)
+            {
+                /* Since avail_out is 0, deflate will be called again with
+                 * more output space, but possibly with both pending and
+                 * avail_in equal to zero. There won't be anything to do,
+                 * but this is not an error situation so make sure we
+                 * return OK instead of BUF_ERROR at next call of deflate:
+                 */
+                s.last_flush = -1;
+                return Z_OK;
+            }
+
+            /* Make sure there is something to do and avoid duplicate consecutive
+             * flushes. For repeated and useless calls with Z_FINISH, we keep
+             * returning Z_STREAM_END instead of Z_BUF_ERROR.
+             */
+        }
+        else if (strm.avail_in == 0
+            && Rank(flush) <= Rank(old_flush)
+            && flush != Z_FINISH)
+        {
+            return ReturnWithError(strm, Z_BUF_ERROR);
+        }
+
+        // User must not provide more input after the first FINISH:
+        if (s.status == FinishState && strm.avail_in != 0)
+            return ReturnWithError(strm, Z_BUF_ERROR);
+
+        // Write the header
+        if (s.status == InitState && s.wrap == 0)
+            s.status = BusyState;
+        if (s.status == InitState)
+        {
+            // zlib header
+            uint header = (Z_DEFLATED + ((s.w_bits - 8) << 4)) << 8;
+            uint level_flags;
+
+            if (s.strategy >= Z_HUFFMAN_ONLY || s.level < 2)
+                level_flags = 0;
+            else if (s.level < 6)
+                level_flags = 1;
+            else if (s.level == 6)
+                level_flags = 2;
+            else
+                level_flags = 3;
+            header |= level_flags << 6;
+            if (s.strstart != 0)
+                header |= PresetDict;
+            header += 31 - header % 31;
+
+            PutShort(s, header);
+
+            // Save the adler32 of the preset dictionary:
+            if (s.strstart != 0)
+            {
+                PutShort(s, strm.Adler >> 16);
+                PutShort(s, strm.Adler & 0xffff);
+            }
+            strm.Adler = Adler32.Update(0, null, 0);
+            s.status = BusyState;
+
+            // Compression must start with an empty pending buffer
+            FlushPending(strm);
             if (s.pending != 0)
             {
+                s.last_flush = -1;
+                return Z_OK;
+            }
+        }
+
+        // Start a new block or continue the current one.
+        if (strm.avail_in != 0
+            || s.lookahead != 0
+            || flush != Z_NO_FLUSH && s.status != FinishState)
+        {
+            BlockState bstate = s.level == 0 ? DeflateStored(s, flush) :
+                     s.strategy == Z_HUFFMAN_ONLY ? DeflateHuff(s, flush) :
+                     s.strategy == Z_RLE ? DeflateRle(s, flush) :
+                     Deflate(s, flush);
+
+            if (bstate == BlockState.FinishStarted || bstate == BlockState.FinishDone)
+            {
+                s.status = FinishState;
+            }
+            if (bstate == BlockState.NeedMore || bstate == BlockState.FinishStarted)
+            {
+                if (strm.avail_out == 0)
+                    s.last_flush = -1; // avoid BUF_ERROR next call, see above
+                return Z_OK;
+                /* If flush != Z_NO_FLUSH && avail_out == 0, the next call
+                 * of deflate should use the same flush parameter to make sure
+                 * that the flush is complete. So we don't have to output an
+                 * empty block here, this will be done at next call. This also
+                 * ensures that for a very small output buffer, we emit at most
+                 * one empty block.
+                 */
+            }
+            if (bstate == BlockState.BlockDone)
+            {
+                if (flush == Z_PARTIAL_FLUSH)
+                {
+                    Tree.Align(s);
+                }
+                else if (flush != Z_BLOCK) // FULL_FLUSH or SYNC_FLUSH
+                {
+                    Tree.StoredBlock(s, null, 0, 0);
+                    /* For a full flush, this empty block will be recognized
+                     * as a special marker by InflateSync().
+                     */
+                    if (flush == Z_FULL_FLUSH)
+                    {
+                        Array.Clear(s.head, 0, s.head.Length);
+                        if (s.lookahead == 0)
+                        {
+                            s.strstart = 0;
+                            s.block_start = 0;
+                            s.insert = 0;
+                        }
+                    }
+                }
                 FlushPending(strm);
                 if (strm.avail_out == 0)
                 {
-                    /* Since avail_out is 0, deflate will be called again with
-                     * more output space, but possibly with both pending and
-                     * avail_in equal to zero. There won't be anything to do,
-                     * but this is not an error situation so make sure we
-                     * return OK instead of BUF_ERROR at next call of deflate:
-                     */
-                    s.last_flush = -1;
-                    return Z_OK;
-                }
-
-                /* Make sure there is something to do and avoid duplicate consecutive
-                 * flushes. For repeated and useless calls with Z_FINISH, we keep
-                 * returning Z_STREAM_END instead of Z_BUF_ERROR.
-                 */
-            }
-            else if (strm.avail_in == 0
-                && Rank(flush) <= Rank(old_flush)
-                && flush != Z_FINISH)
-            {
-                return ReturnWithError(strm, Z_BUF_ERROR);
-            }
-
-            // User must not provide more input after the first FINISH:
-            if (s.status == FinishState && strm.avail_in != 0)
-                return ReturnWithError(strm, Z_BUF_ERROR);
-
-            // Write the header
-            if (s.status == InitState && s.wrap == 0)
-                s.status = BusyState;
-            if (s.status == InitState)
-            {
-                // zlib header
-                uint header = (Z_DEFLATED + ((s.w_bits - 8) << 4)) << 8;
-                uint level_flags;
-
-                if (s.strategy >= Z_HUFFMAN_ONLY || s.level < 2)
-                    level_flags = 0;
-                else if (s.level < 6)
-                    level_flags = 1;
-                else if (s.level == 6)
-                    level_flags = 2;
-                else
-                    level_flags = 3;
-                header |= level_flags << 6;
-                if (s.strstart != 0)
-                    header |= PresetDict;
-                header += 31 - header % 31;
-
-                PutShort(s, header);
-
-                // Save the adler32 of the preset dictionary:
-                if (s.strstart != 0)
-                {
-                    PutShort(s, strm.Adler >> 16);
-                    PutShort(s, strm.Adler & 0xffff);
-                }
-                strm.Adler = Adler32.Update(0, null, 0);
-                s.status = BusyState;
-
-                // Compression must start with an empty pending buffer
-                FlushPending(strm);
-                if (s.pending != 0)
-                {
-                    s.last_flush = -1;
+                    s.last_flush = -1; // avoid BUF_ERROR at next call, see above
                     return Z_OK;
                 }
             }
-
-            // Start a new block or continue the current one.
-            if (strm.avail_in != 0
-                || s.lookahead != 0
-                || flush != Z_NO_FLUSH && s.status != FinishState)
-            {
-                BlockState bstate = s.level == 0 ? DeflateStored(s, flush) :
-                         s.strategy == Z_HUFFMAN_ONLY ? DeflateHuff(s, flush) :
-                         s.strategy == Z_RLE ? DeflateRle(s, flush) :
-                         Deflate(s, flush);
-
-                if (bstate == BlockState.FinishStarted || bstate == BlockState.FinishDone)
-                {
-                    s.status = FinishState;
-                }
-                if (bstate == BlockState.NeedMore || bstate == BlockState.FinishStarted)
-                {
-                    if (strm.avail_out == 0)
-                        s.last_flush = -1; // avoid BUF_ERROR next call, see above
-                    return Z_OK;
-                    /* If flush != Z_NO_FLUSH && avail_out == 0, the next call
-                     * of deflate should use the same flush parameter to make sure
-                     * that the flush is complete. So we don't have to output an
-                     * empty block here, this will be done at next call. This also
-                     * ensures that for a very small output buffer, we emit at most
-                     * one empty block.
-                     */
-                }
-                if (bstate == BlockState.BlockDone)
-                {
-                    if (flush == Z_PARTIAL_FLUSH)
-                    {
-                        Tree.Align(s);
-                    }
-                    else if (flush != Z_BLOCK) // FULL_FLUSH or SYNC_FLUSH
-                    {
-                        Tree.StoredBlock(s, null, 0, 0);
-                        /* For a full flush, this empty block will be recognized
-                         * as a special marker by InflateSync().
-                         */
-                        if (flush == Z_FULL_FLUSH)
-                        {
-                            Array.Clear(s.head, 0, s.head.Length);
-                            if (s.lookahead == 0)
-                            {
-                                s.strstart = 0;
-                                s.block_start = 0;
-                                s.insert = 0;
-                            }
-                        }
-                    }
-                    FlushPending(strm);
-                    if (strm.avail_out == 0)
-                    {
-                        s.last_flush = -1; // avoid BUF_ERROR at next call, see above
-                        return Z_OK;
-                    }
-                }
-            }
-
-            if (flush != Z_FINISH)
-                return Z_OK;
-            if (s.wrap <= 0)
-                return Z_STREAM_END;
-
-            // Write the trailer
-            PutShort(s, strm.Adler >> 16);
-            PutShort(s, strm.Adler & 0xffff);
-
-            FlushPending(strm);
         }
+
+        if (flush != Z_FINISH)
+            return Z_OK;
+        if (s.wrap <= 0)
+            return Z_STREAM_END;
+
+        // Write the trailer
+        PutShort(s, strm.Adler >> 16);
+        PutShort(s, strm.Adler & 0xffff);
+
+        FlushPending(strm);
+
         // If avail_out is zero, the application will call deflate again to flush the rest.
         if (s.wrap > 0)
             s.wrap = -s.wrap; // write the trailer only once!
@@ -294,17 +290,18 @@ internal static partial class Deflater
 
         unsafe
         {
-            Buffer.MemoryCopy(s.pending_out, strm.next_out, len, len);
+            netUnsafe.CopyBlock(ref netUnsafe.AsRef<byte>(strm.next_out),
+                ref MemoryMarshal.GetReference(s.pending_out.AsSpan(s.pendingOutOffset)), len);
             strm.next_out += len;
-            s.pending_out += len;
-            s.pendingOutOffset += (int)len;
-            s.pending -= len;
-            if (s.pending == 0)
-            {
-                s.pending_out = s.pending_buf;
-                s.pendingOutOffset = 0;
-            }
         }
+        s.pendingOutOffset += (int)len;
+        s.pending -= len;
+        if (s.pending == 0)
+        {
+            s.pending_out = s.pending_buf;
+            s.pendingOutOffset = 0;
+        }
+
         strm.total_out += len;
         strm.avail_out -= len;
     }
@@ -749,9 +746,9 @@ internal static partial class Deflater
     private static unsafe void TreeTallyLit(DeflateState s, byte c, out bool flush)
 #if DEBUG
     {
-        s.sym_buf[s.sym_next++] = 0;
-        s.sym_buf[s.sym_next++] = 0;
-        s.sym_buf[s.sym_next++] = c;
+        s.pending_buf[s.lit_bufsize + s.sym_next++] = 0;
+        s.pending_buf[s.lit_bufsize + s.sym_next++] = 0;
+        s.pending_buf[s.lit_bufsize + s.sym_next++] = c;
         s.dyn_ltree[c].fc++;
         flush = s.sym_next == s.sym_end;
     }
@@ -846,9 +843,9 @@ internal static partial class Deflater
     {
         byte len = (byte)length;
         ushort dist = (ushort)distance;
-        s.sym_buf[s.sym_next++] = (byte)dist;
-        s.sym_buf[s.sym_next++] = (byte)(dist >> 8);
-        s.sym_buf[s.sym_next++] = len;
+        s.pending_buf[s.lit_bufsize + s.sym_next++] = (byte)dist;
+        s.pending_buf[s.lit_bufsize + s.sym_next++] = (byte)(dist >> 8);
+        s.pending_buf[s.lit_bufsize + s.sym_next++] = len;
         dist--;
         s.dyn_ltree[Tree.s_length_code[len] + Literals + 1].fc++;
         s.dyn_dtree[Tree.DCode(dist)].fc++;
