@@ -3,6 +3,7 @@
 
 using System;
 using System.Buffers;
+using System.Runtime.InteropServices;
 
 namespace ZLibDotNet.Inflate;
 
@@ -86,30 +87,33 @@ internal static partial class Inflater
         copy.sane = state.sane;
         copy.back = state.back;
         copy.was = state.was;
-        unsafe
-        {
-            fixed (ushort* lensSrc = state.lens, lensDest = copy.lens, workSrc = state.work, workDest = copy.work)
-            {
-                Buffer.MemoryCopy(lensSrc, lensDest, state.lens.Length, state.lens.Length);
-                Buffer.MemoryCopy(workSrc, workDest, state.work.Length, state.work.Length);
-            }
-            fixed (Code* src = state.codes, destination = copy.codes)
-            {
-                Buffer.MemoryCopy(src, destination, state.codes.Length, state.codes.Length);
 
-                if (state.lencode >= src && state.lencode <= src + InflateState.Enough - 1)
-                {
-                    copy.lencode = destination + (state.lencode - src);
-                    copy.distcode = destination + (state.distcode - src);
-                }
-                copy.next = destination + (state.next - src);
-            }
-            if (window != default)
-            {
-                fixed (byte* src = state.window, destination = window)
-                    Buffer.MemoryCopy(src, destination, wsize, wsize);
-            }
-        }
+        netUnsafe.CopyBlock(ref netUnsafe.As<ushort, byte>(ref MemoryMarshal.GetReference(copy.lens.AsSpan())),
+            ref netUnsafe.As<ushort, byte>(ref MemoryMarshal.GetReference(state.lens.AsSpan())), (uint)(state.lens.Length * sizeof(ushort)));
+
+        netUnsafe.CopyBlock(ref netUnsafe.As<ushort, byte>(ref MemoryMarshal.GetReference(copy.work.AsSpan())),
+            ref netUnsafe.As<ushort, byte>(ref MemoryMarshal.GetReference(state.work.AsSpan())), (uint)(state.work.Length * sizeof(ushort)));
+
+        netUnsafe.CopyBlock(ref netUnsafe.As<Code, byte>(ref MemoryMarshal.GetReference(copy.codes.AsSpan())),
+            ref netUnsafe.As<Code, byte>(ref MemoryMarshal.GetReference(state.codes.AsSpan())), (uint)(state.codes.Length * Code.Size));
+
+        if (state.lencode == s_lenfix)
+            copy.lencode = s_lenfix;
+        else if (state.lencode == state.codes)
+            copy.lencode = copy.codes;
+
+        if (state.distcode == s_distfix)
+            copy.distcode = s_distfix;
+        else if (state.distcode == state.codes)
+            copy.distcode = copy.codes;
+
+        copy.next = state.next;
+        copy.diststart = state.diststart;
+
+        if (window != default)
+            netUnsafe.CopyBlock(ref MemoryMarshal.GetReference(window.AsSpan()),
+                ref MemoryMarshal.GetReference(state.window.AsSpan()), (uint)wsize);
+
         copy.window = window;
         return Z_OK;
     }

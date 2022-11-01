@@ -69,7 +69,9 @@ internal static partial class Inflater
         state.dmax = 32768U;
         state.hold = 0;
         state.bits = 0;
-        state.lencode = state.distcode = state.next = default;
+        state.lencode = state.distcode = state.codes;
+        state.next = default;
+        state.diststart = default;
         state.sane = 1;
         state.back = -1;
         Trace.Tracev("inflate: reset\n");

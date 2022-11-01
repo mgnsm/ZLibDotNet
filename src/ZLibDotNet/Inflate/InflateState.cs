@@ -6,9 +6,9 @@ namespace ZLibDotNet.Inflate;
 /// <summary>
 /// State maintained between <see cref="ZLib.Inflate(Unsafe.ZStream, int)"/> calls.
 /// </summary>
-internal unsafe class InflateState
+internal class InflateState
 {
-    internal const ushort Enough = Inflater.EnoughLens + Inflater.EnoughDists;
+    private const ushort Enough = Inflater.EnoughLens + Inflater.EnoughDists;
 
     internal Unsafe.ZStream strm;   // reference back to this zlib stream
     internal InflateMode mode;      // current inflate mode
@@ -29,15 +29,16 @@ internal unsafe class InflateState
     internal uint length;           // literal or length of data to copy
     internal uint offset;           // distance back to copy string from
     internal uint extra;            // extra bits needed
-    internal Code* lencode;         // starting table for length/literal codes
-    internal Code* distcode;        // starting table for distance codes
+    internal Code[] lencode;        // starting table for length/literal codes
+    internal Code[] distcode;       // starting table for distance codes
     internal uint lenbits;          // index bits for lencode
     internal uint distbits;         // index bits for distcode
     internal uint ncode;            // number of code length code lengths
     internal uint nlen;             // number of length code lengths
     internal uint ndist;            // number of distance code lengths
     internal uint have;             // number of code lengths in lens[]
-    internal Code* next;            // next available space in codes[]
+    internal int next;              // next available space in codes[]
+    internal int diststart;         // starting index in codes[] for distance codes
     internal readonly ushort[] lens = new ushort[320]; // temporary storage for code lengths
     internal readonly ushort[] work = new ushort[288]; // work area for code table building
     internal readonly Code[] codes = new Code[Enough]; // space for code tables

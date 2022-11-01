@@ -27,7 +27,7 @@ internal static partial class Inflater
         23, 23, 24, 24, 25, 25, 26, 26, 27, 27,
         28, 28, 29, 29, 64, 64 };
 
-    internal static unsafe int InflateTable(CodeType type, ushort* lens, uint codes, ref Code* table, ref uint bits, ushort* work)
+    internal static unsafe int InflateTable(CodeType type, ushort* lens, uint codes, ref Code table, ref uint bits, ushort* work, ref int offset)
     {
         uint len;               // a code's length in bits
         uint sym;               // index of code symbols
@@ -43,7 +43,6 @@ internal static partial class Inflater
         uint low;               // low bits for current root entry
         uint mask;              // mask for low root bits
         Code here;              // table entry for duplication
-        Code* next;             // next available space in table
         ushort* @base;          // base value table to use
         ushort* extra;          // extra bits table to use
         uint match;             // use base and extra for symbol >= match
@@ -66,8 +65,11 @@ internal static partial class Inflater
         if (max == 0) // no symbols to code at all
         {
             here = new Code(64 /* invalid code marker */, 1, 0);
-            *table++ = here; // make a table to force an error
-            *table++ = here;
+            table = here; // make a table to force an error
+            table = ref netUnsafe.Add(ref table, 1);
+            table = here;
+            table = ref netUnsafe.Add(ref table, 1);
+            offset += 2;
             bits = 1;
             return 0; // no symbols, but wait for decoding to report error
         }
@@ -124,12 +126,13 @@ internal static partial class Inflater
             huff = 0;                   // starting code
             sym = 0;                    // starting code symbol
             len = min;                  // starting code length
-            next = table;               // current table to fill in
+            ref Code next = ref table;  // current table to fill in
             curr = root;                // current table index bits
             drop = 0;                   // current bits to drop from code for index
-            low = unchecked((uint)-1);  // trigger new sub-table when len > root
+            low = uint.MaxValue;        // trigger new sub-table when len > root
             used = 1U << (int)root;     // use root table entries
             mask = used - 1;            // mask for comparing low
+            int val = 0;
 
             // check available table space
             if (type == CodeType.Lens && used > EnoughLens ||
@@ -155,7 +158,7 @@ internal static partial class Inflater
                 do
                 {
                     fill -= incr;
-                    next[(huff >> (int)drop) + fill] = here;
+                    netUnsafe.Add(ref next, (int)((huff >> (int)drop) + fill)) = here;
                 } while (fill != 0);
 
                 // backwards increment the len-bit code huff
@@ -187,7 +190,9 @@ internal static partial class Inflater
                         drop = root;
 
                     // increment past last table
-                    next += min; // here min is 1 << curr
+                    int cast = (int)min;
+                    next = ref netUnsafe.Add(ref next, cast);
+                    val += cast;
 
                     // determine length of next table
                     curr = len - drop;
@@ -209,19 +214,18 @@ internal static partial class Inflater
 
                     // point entry in root table to sub-table
                     low = huff & mask;
-                    table[low] = new Code((byte)curr, (byte)root, (ushort)(next - table));
+                    netUnsafe.Add(ref table, (int)low) = new Code((byte)curr, (byte)root, (ushort)val);
                 }
             }
+            /* Fill in remaining table entry if code is incomplete (guaranteed to have 
+             * at most one remaining entry, since if the code is incomplete, the 
+             * maximum code length that was allowed to get this far is one bit) */
+            if (huff != 0)
+                netUnsafe.Add(ref next, (int)huff) = new Code(64 /* invalid code marker */, (byte)(len - drop), 0);
         }
 
-        /* Fill in remaining table entry if code is incomplete (guaranteed to have 
-         * at most one remaining entry, since if the code is incomplete, the 
-         * maximum code length that was allowed to get this far is one bit) */
-        if (huff != 0)
-            next[huff] = new Code(64 /* invalid code marker */, (byte)(len - drop), 0);
-
         // set return parameters
-        table += used;
+        offset += (int)used;
         bits = root;
         return 0;
     }

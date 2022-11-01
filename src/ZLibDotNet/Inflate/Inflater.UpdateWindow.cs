@@ -13,8 +13,7 @@ internal static partial class Inflater
         InflateState state = strm.inflateState;
 
         // if it hasn't been done already, allocate space for the window
-        if (state.window == null)
-            state.window = ArrayPool<byte>.Shared.Rent(1 << (int)state.wbits);
+        state.window ??= ArrayPool<byte>.Shared.Rent(1 << (int)state.wbits);
 
         // if window not in use yet, initialize
         if (state.wsize == 0)

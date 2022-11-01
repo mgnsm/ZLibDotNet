@@ -2,6 +2,7 @@
 // Managed C#/.NET code Copyright (C) 2022 Magnus Montin
 
 using System;
+using System.Runtime.InteropServices;
 
 namespace ZLibDotNet.Inflate;
 
@@ -20,11 +21,10 @@ internal static partial class Inflater
         uint wnext = state.wnext;
         uint hold = state.hold;
         uint bits = state.bits;
-        Code* lcode = state.lencode;
-        Code* dcode = state.distcode;
+        ref Code lcode = ref MemoryMarshal.GetReference(state.lencode.AsSpan());
+        ref Code dcode = ref MemoryMarshal.GetReference(state.distcode.AsSpan(state.diststart));
         uint lmask = (1U << (int)state.lenbits) - 1;
         uint dmask = (1U << (int)state.distbits) - 1;
-        Code* here;  // retrieved table entry
         uint op;    // code bits, operation, extra bits, or window position, window bytes to copy
         uint len;   // match length, unused bytes
         uint dist;  // match distance
@@ -43,22 +43,22 @@ internal static partial class Inflater
                     hold += (uint)*@in++ << (int)bits;
                     bits += 8;
                 }
-                here = lcode + (hold & lmask);
+                ref Code here = ref netUnsafe.Add(ref lcode, (int)(hold & lmask));
             dolen:
-                op = here->bits;
+                op = here.bits;
                 hold >>= (int)op;
                 bits -= op;
-                op = here->op;
+                op = here.op;
                 if (op == 0) // literal
                 {
-                    Trace.Tracevv(here->val >= 0x20 && here->val < 0x7f ?
-                        $"inflate:         literal '{Convert.ToChar(here->val)}'\n" :
-                        $"inflate:         literal 0x{here->val:X2}\n");
-                    *@out++ = (byte)here->val;
+                    Trace.Tracevv(here.val >= 0x20 && here.val < 0x7f ?
+                        $"inflate:         literal '{Convert.ToChar(here.val)}'\n" :
+                        $"inflate:         literal 0x{here.val:X2}\n");
+                    *@out++ = (byte)here.val;
                 }
                 else if ((op & 16) != 0) // length base
                 {
-                    len = here->val;
+                    len = here.val;
                     op &= 15; // number of extra bits
                     if (op != 0)
                     {
@@ -79,15 +79,15 @@ internal static partial class Inflater
                         hold += (uint)*@in++ << (int)bits;
                         bits += 8;
                     }
-                    here = dcode + (hold & dmask);
+                    here = ref netUnsafe.Add(ref dcode, (int)(hold & dmask));
                 dodist:
-                    op = here->bits;
+                    op = here.bits;
                     hold >>= (int)op;
                     bits -= op;
-                    op = here->op;
+                    op = here.op;
                     if ((op & 16) != 0) // distance base
                     {
-                        dist = here->val;
+                        dist = here.val;
                         op &= 15; // number of extra bits
                         if (bits < op)
                         {
@@ -201,7 +201,7 @@ internal static partial class Inflater
                     }
                     else if ((op & 64) == 0) // 2nd level distance code
                     {
-                        here = dcode + here->val + (hold & ((1U << (int)op) - 1));
+                        here = ref netUnsafe.Add(ref dcode, (int)(here.val + (hold & ((1U << (int)op) - 1))));
                         goto dodist;
                     }
                     else
@@ -213,7 +213,7 @@ internal static partial class Inflater
                 }
                 else if ((op & 64) == 0) // 2nd level length code
                 {
-                    here = lcode + here->val + (hold & ((1U << (int)op) - 1));
+                    here = ref netUnsafe.Add(ref lcode, (int)(here.val + (hold & ((1U << (int)op) - 1))));
                     goto dolen;
                 }
                 else if ((op & 32) != 0) // end-of-block

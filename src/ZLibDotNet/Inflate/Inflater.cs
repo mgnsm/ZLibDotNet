@@ -3,6 +3,7 @@
 
 using System;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace ZLibDotNet.Inflate;
 
@@ -122,12 +123,9 @@ internal static partial class Inflater
         uint len;           // length to copy for repeats, bits to drop
         int ret = Z_OK;
 
-        fixed (Code* codes = state.codes, lenfix = s_lenfix, distfix = s_distfix)
         fixed (ushort* lens = state.lens, work = state.work)
         fixed (byte* window = state.window)
         {
-            if (state.lencode == null && state.distcode == null && state.next == null)
-                state.lencode = state.distcode = state.next = codes;
             for (; ; )
                 switch (state.mode)
                 {
@@ -206,9 +204,10 @@ internal static partial class Inflater
                                 state.mode = InflateMode.Stored;
                                 break;
                             case 1: // fixed block
-                                state.lencode = lenfix;
+                                state.lencode = s_lenfix;
                                 state.lenbits = 9;
-                                state.distcode = distfix;
+                                state.diststart = default;
+                                state.distcode = s_distfix;
                                 state.distbits = 5;
                                 Trace.Tracev($"inflate:     fixed codes block{(state.last != 0 ? " (last)" : "")}\n");
                                 state.mode = InflateMode.Len_; // decode codes
@@ -299,10 +298,10 @@ internal static partial class Inflater
                         }
                         while (state.have < 19)
                             state.lens[s_order[state.have++]] = 0;
-                        state.next = codes;
-                        state.lencode = state.next;
+                        state.next = 0;
+                        state.lencode = state.codes;
                         state.lenbits = 7;
-                        ret = InflateTable(CodeType.Codes, lens, 19, ref state.next, ref state.lenbits, work);
+                        ret = InflateTable(CodeType.Codes, lens, 19, ref MemoryMarshal.GetReference(state.codes.AsSpan()), ref state.lenbits, work, ref state.next);
                         if (ret != 0)
                         {
                             strm.msg = "invalid code lengths set";
@@ -388,19 +387,22 @@ internal static partial class Inflater
                         }
 
                         // build code tables
-                        state.next = codes;
-                        state.lencode = state.next;
+                        state.next = 0;
+                        state.lencode = state.codes;
                         state.lenbits = 9;
-                        ret = InflateTable(CodeType.Lens, lens, state.nlen, ref state.next, ref state.lenbits, work);
+                        ref Code codes = ref MemoryMarshal.GetReference(state.codes.AsSpan());
+                        ret = InflateTable(CodeType.Lens, lens, state.nlen, ref codes, ref state.lenbits, work, ref state.next);
                         if (ret != 0)
                         {
                             strm.msg = "invalid literal/lengths set";
                             state.mode = InflateMode.Bad;
                             break;
                         }
-                        state.distcode = state.next;
+                        state.distcode = state.codes;
+                        state.diststart = state.next;
                         state.distbits = 6;
-                        ret = InflateTable(CodeType.Dists, lens + state.nlen, state.ndist, ref state.next, ref state.distbits, work);
+                        codes = ref netUnsafe.Add(ref codes, state.next);
+                        ret = InflateTable(CodeType.Dists, lens + state.nlen, state.ndist, ref codes, ref state.distbits, work, ref state.next);
                         if (ret != 0)
                         {
                             strm.msg = "invalid distances set";
@@ -493,7 +495,7 @@ internal static partial class Inflater
                     case InflateMode.Dist:
                         for (; ; )
                         {
-                            here = state.distcode[x.Bits((int)state.distbits)];
+                            here = state.distcode[state.diststart + x.Bits((int)state.distbits)];
                             if (here.bits <= x.bits)
                                 break;
                             if (!x.PullByte())
@@ -504,7 +506,7 @@ internal static partial class Inflater
                             last = here;
                             for (; ; )
                             {
-                                here = state.distcode[last.val +
+                                here = state.distcode[state.diststart + last.val +
                                     (x.Bits(last.bits + last.op) >> last.bits)];
                                 if ((uint)(last.bits + here.bits) <= x.bits)
                                     break;

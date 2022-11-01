@@ -28,4 +28,6 @@ internal readonly struct Code
         this.bits = bits;
         this.val = val;
     }
+
+    internal static int Size { get; } = netUnsafe.SizeOf<Code>();
 }
