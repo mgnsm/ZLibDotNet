@@ -1,6 +1,10 @@
 ﻿// Original code and comments Copyright (C) 1995-2022 Mark Adler
 // Managed C#/.NET code Copyright (C) 2022 Magnus Montin
 
+using System;
+using System.Buffers;
+using System.Runtime.InteropServices;
+
 namespace ZLibDotNet.Inflate;
 
 internal static partial class Inflater
@@ -27,112 +31,115 @@ internal static partial class Inflater
         23, 23, 24, 24, 25, 25, 26, 26, 27, 27,
         28, 28, 29, 29, 64, 64 };
 
-    internal static unsafe int InflateTable(CodeType type, ushort* lens, uint codes, ref Code table, ref uint bits, ushort* work, ref int offset)
+    internal static int InflateTable(CodeType type, ref ushort lens, int codes, ref Code table, ref int bits, ref ushort work, ref int offset)
     {
-        uint len;               // a code's length in bits
-        uint sym;               // index of code symbols
-        uint min, max;          // minimum and maximum code lengths
-        uint root;              // number of index bits for root table
-        uint curr;              // number of index bits for current table
-        uint drop;              // code bits to drop for sub-table
-        int left;               // number of prefix codes available
-        uint used;              // code entries in table used
-        uint huff;              // Huffman code
-        uint incr;              // for incrementing code, index
-        uint fill;              // index for replicating entries
-        uint low;               // low bits for current root entry
-        uint mask;              // mask for low root bits
-        Code here;              // table entry for duplication
-        ushort* @base;          // base value table to use
-        ushort* extra;          // extra bits table to use
-        uint match;             // use base and extra for symbol >= match
-        ushort[] count = new ushort[MaxBits + 1]; // number of codes of each length
-        ushort[] offs = new ushort[MaxBits + 1];  // offsets in table for each length
+        int len;                   // a code's length in bits
+        int sym;                   // index of code symbols
+        int min, max;              // minimum and maximum code lengths
+        int root;                  // number of index bits for root table
+        int incr;                  // for incrementing code, index
+        int fill;                  // index for replicating entries
+        Code here;                 // table entry for duplication
+        ushort[] count = default;  // number of codes of each length
+        ushort[] offs = default;   // offsets in table for each length
 
-        // accumulate lengths for codes (assumes lens[] all in 0..MAXBITS)
-        for (len = 0; len <= MaxBits; len++)
-            count[len] = 0;
-        for (sym = 0; sym < codes; sym++)
-            count[lens[sym]]++;
-
-        // bound code lengths, force root to be within code lengths
-        root = bits;
-        for (max = MaxBits; max >= 1; max--)
-            if (count[max] != 0)
-                break;
-        if (root > max)
-            root = max;
-        if (max == 0) // no symbols to code at all
+        try
         {
-            here = new Code(64 /* invalid code marker */, 1, 0);
-            table = here; // make a table to force an error
-            table = ref netUnsafe.Add(ref table, 1);
-            table = here;
-            table = ref netUnsafe.Add(ref table, 1);
-            offset += 2;
-            bits = 1;
-            return 0; // no symbols, but wait for decoding to report error
-        }
-        for (min = 1; min < max; min++)
-            if (count[min] != 0)
-                break;
-        if (root < min)
-            root = min;
+            const int Length = MaxBits + 1;
+            count = ArrayPool<ushort>.Shared.Rent(Length);
+            ref ushort ptrToCount = ref MemoryMarshal.GetReference(count.AsSpan());
 
-        // check for an over-subscribed or incomplete set of lengths
-        left = 1;
-        for (len = 1; len <= MaxBits; len++)
-        {
-            left <<= 1;
-            left -= count[len];
-            if (left < 0)
-                return -1; // over-subscribed
-        }
-        if (left > 0 && (type == CodeType.Codes || max != 1))
-            return -1; // incomplete set
+            // accumulate lengths for codes (assumes lens[] all in 0..MAXBITS)
+            netUnsafe.InitBlock(ref netUnsafe.As<ushort, byte>(ref ptrToCount), 0, Length * sizeof(ushort));
 
-        // generate offsets into symbol table for each length for sorting
-        offs[1] = 0;
-        for (len = 1; len < MaxBits; len++)
-            offs[len + 1] = (ushort)(offs[len] + count[len]);
+            for (sym = 0; sym < codes; sym++)
+                netUnsafe.Add(ref ptrToCount, netUnsafe.Add(ref lens, sym))++;
 
-        // sort symbols by length, by symbol order within each length
-        for (sym = 0; sym < codes; sym++)
-            if (lens[sym] != 0)
-                work[offs[lens[sym]]++] = (ushort)sym;
+            // bound code lengths, force root to be within code lengths
+            root = bits;
+            for (max = MaxBits; max >= 1; max--)
+                if (netUnsafe.Add(ref ptrToCount, max) != 0)
+                    break;
+            if (root > max)
+                root = max;
+            if (max == 0) // no symbols to code at all
+            {
+                here = new Code(64 /* invalid code marker */, 1, 0);
+                table = here; // make a table to force an error
+                table = ref netUnsafe.Add(ref table, 1);
+                table = here;
+                table = ref netUnsafe.Add(ref table, 1);
+                offset += 2;
+                bits = 1;
+                return 0; // no symbols, but wait for decoding to report error
+            }
+            for (min = 1; min < max; min++)
+                if (netUnsafe.Add(ref ptrToCount, min) != 0)
+                    break;
+            if (root < min)
+                root = min;
 
-        fixed (ushort* lbase = s_lbase, lext = s_lext, dbase = s_dbase, dext = s_dext)
-        {
+            // check for an over-subscribed or incomplete set of lengths
+            int left = 1; // number of prefix codes available
+            for (len = 1; len <= MaxBits; len++)
+            {
+                left <<= 1;
+                left -= netUnsafe.Add(ref ptrToCount, len);
+                if (left < 0)
+                    return -1; // over-subscribed
+            }
+            if (left > 0 && (type == CodeType.Codes || max != 1))
+                return -1; // incomplete set
+
+            // generate offsets into symbol table for each length for sorting
+            offs = ArrayPool<ushort>.Shared.Rent(Length);
+            ref ushort ptrToOffs = ref MemoryMarshal.GetReference(offs.AsSpan());
+            netUnsafe.Add(ref ptrToOffs, 1) = 0;
+            for (len = 1; len < MaxBits; len++)
+                netUnsafe.Add(ref ptrToOffs, len + 1) = (ushort)(netUnsafe.Add(ref ptrToOffs, len) + netUnsafe.Add(ref ptrToCount, len));
+
+            // sort symbols by length, by symbol order within each length
+            for (sym = 0; sym < codes; sym++)
+                if (netUnsafe.Add(ref lens, sym) != 0)
+                    netUnsafe.Add(ref work, netUnsafe.Add(ref ptrToOffs, netUnsafe.Add(ref lens, sym))++) = (ushort)sym;
+
+            ref ushort lbase = ref MemoryMarshal.GetReference(s_lbase.AsSpan());
+            ref ushort lext = ref MemoryMarshal.GetReference(s_lext.AsSpan());
+            ref ushort dbase = ref MemoryMarshal.GetReference(s_dbase.AsSpan());
+            ref ushort dext = ref MemoryMarshal.GetReference(s_dext.AsSpan());
+            ref ushort @base = ref netUnsafe.NullRef<ushort>(); // base value table to use
+            ref ushort extra = ref netUnsafe.NullRef<ushort>(); // extra bits table to use
+            int match; // use base and extra for symbol >= match
             // set up for code type
             switch (type)
             {
                 case CodeType.Codes:
-                    @base = extra = work; // dummy value--not used
+                    @base = ref work; // dummy value--not used
+                    extra = ref work; // dummy value--not used
                     match = 20;
                     break;
                 case CodeType.Lens:
-                    @base = lbase;
-                    extra = lext;
+                    @base = ref lbase;
+                    extra = ref lext;
                     match = 257;
                     break;
                 default: // DISTS
-                    @base = dbase;
-                    extra = dext;
+                    @base = ref dbase;
+                    extra = ref dext;
                     match = 0;
                     break;
             }
 
             // initialize state for loop
-            huff = 0;                   // starting code
-            sym = 0;                    // starting code symbol
-            len = min;                  // starting code length
-            ref Code next = ref table;  // current table to fill in
-            curr = root;                // current table index bits
-            drop = 0;                   // current bits to drop from code for index
-            low = uint.MaxValue;        // trigger new sub-table when len > root
-            used = 1U << (int)root;     // use root table entries
-            mask = used - 1;            // mask for comparing low
-            int val = 0;
+            int huff = 0;           // starting code
+            sym = 0;                // starting code symbol
+            len = min;              // starting code length
+            int next = 0;           // current offset to table to fill in
+            int curr = root;        // current table index bits
+            int drop = 0;           // current bits to drop from code for index
+            int low = int.MaxValue; // trigger new sub-table when len > root
+            int used = 1 << root;   // use root table entries
+            int mask = used - 1;    // mask for comparing low
 
             // check available table space
             if (type == CodeType.Lens && used > EnoughLens ||
@@ -144,25 +151,27 @@ internal static partial class Inflater
             {
                 // create table entry
                 byte temp = (byte)(len - drop);
-                if (work[sym] + 1U < match)
-                    here = new Code(0, temp, work[sym]);
-                else if (work[sym] >= match)
-                    here = new Code((byte)extra[work[sym] - match], temp, @base[work[sym] - match]);
+                ushort wsym = netUnsafe.Add(ref work, sym);
+                int diff = wsym - match;
+                if (wsym + 1 < match)
+                    here = new Code(0, temp, wsym);
+                else if (wsym >= match)
+                    here = new Code((byte)netUnsafe.Add(ref extra, diff), temp, netUnsafe.Add(ref @base, diff));
                 else
                     here = new Code(32 + 64, temp, 0); // end of block
 
                 // replicate for those indices with low len bits equal to huff
-                incr = 1U << (int)(len - drop);
-                fill = 1U << (int)curr;
+                incr = 1 << (len - drop);
+                fill = 1 << curr;
                 min = fill; // save offset to next table
                 do
                 {
                     fill -= incr;
-                    netUnsafe.Add(ref next, (int)((huff >> (int)drop) + fill)) = here;
+                    netUnsafe.Add(ref table, next + (huff >> drop) + fill) = here;
                 } while (fill != 0);
 
                 // backwards increment the len-bit code huff
-                incr = 1U << (int)(len - 1);
+                incr = 1 << (len - 1);
                 while ((huff & incr) != 0)
                     incr >>= 1;
                 if (incr != 0)
@@ -175,11 +184,11 @@ internal static partial class Inflater
 
                 // go to next symbol, update count, len
                 sym++;
-                if (--count[len] == 0)
+                if (--netUnsafe.Add(ref ptrToCount, len) == 0)
                 {
                     if (len == max)
                         break;
-                    len = lens[work[sym]];
+                    len = netUnsafe.Add(ref lens, netUnsafe.Add(ref work, sym));
                 }
 
                 // create new sub-table if needed
@@ -190,16 +199,14 @@ internal static partial class Inflater
                         drop = root;
 
                     // increment past last table
-                    int cast = (int)min;
-                    next = ref netUnsafe.Add(ref next, cast);
-                    val += cast;
+                    next += min; // here min is 1 << curr
 
                     // determine length of next table
                     curr = len - drop;
-                    left = 1 << (int)curr;
+                    left = 1 << curr;
                     while (curr + drop < max)
                     {
-                        left -= count[curr + drop];
+                        left -= netUnsafe.Add(ref ptrToCount, curr + drop);
                         if (left <= 0)
                             break;
                         curr++;
@@ -207,25 +214,34 @@ internal static partial class Inflater
                     }
 
                     // check for enough space
-                    used += 1U << (int)curr;
+                    used += 1 << curr;
                     if (type == CodeType.Lens && used > EnoughLens ||
                         type == CodeType.Dists && used > EnoughDists)
                         return 1;
 
                     // point entry in root table to sub-table
                     low = huff & mask;
-                    netUnsafe.Add(ref table, (int)low) = new Code((byte)curr, (byte)root, (ushort)val);
+                    netUnsafe.Add(ref table, low) = new Code((byte)curr, (byte)root, (ushort)next);
                 }
             }
+
             /* Fill in remaining table entry if code is incomplete (guaranteed to have 
              * at most one remaining entry, since if the code is incomplete, the 
              * maximum code length that was allowed to get this far is one bit) */
             if (huff != 0)
-                netUnsafe.Add(ref next, (int)huff) = new Code(64 /* invalid code marker */, (byte)(len - drop), 0);
+                netUnsafe.Add(ref table, next + huff) = new Code(64 /* invalid code marker */, (byte)(len - drop), 0);
+
+            // set return parameters
+            offset += used;
+        }
+        finally
+        {
+            if (count != default)
+                ArrayPool<ushort>.Shared.Return(count);
+            if (offs != default)
+                ArrayPool<ushort>.Shared.Return(offs);
         }
 
-        // set return parameters
-        offset += (int)used;
         bits = root;
         return 0;
     }

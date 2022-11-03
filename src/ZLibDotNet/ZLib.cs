@@ -3,6 +3,7 @@
 
 global using static ZLibDotNet.ZLib;
 using System;
+using System.Runtime.InteropServices;
 using ZLibDotNet.Deflate;
 using ZLibDotNet.Inflate;
 using Adler = ZLibDotNet.Adler32;
@@ -279,12 +280,13 @@ public partial class ZLib : IZLib, Unsafe.IZLib
 
         unsafe
         {
-            fixed (byte* dict = dictionary, input = strm.Input, output = strm.Output)
+            fixed (byte* input = strm.Input, output = strm.Output)
             {
                 unsafeStrm.NextIn = input + strm.inputOffset;
                 unsafeStrm.NextOut = output + strm.outputOffset;
 
-                int ret = Deflater.DeflateSetDictionary(unsafeStrm, dict, (uint)dictionary.Length);
+                ref byte dict = ref MemoryMarshal.GetReference(dictionary.AsSpan());
+                int ret = Deflater.DeflateSetDictionary(unsafeStrm, ref dict, dictionary.Length);
 
                 strm.inputOffset = (int)(unsafeStrm.NextIn - input);
                 strm.outputOffset = (int)(unsafeStrm.NextOut - output);
@@ -293,18 +295,6 @@ public partial class ZLib : IZLib, Unsafe.IZLib
             }
         }
     }
-
-    /// <summary>
-    /// Initializes the compression dictionary from the given byte sequence without producing any compressed output.
-    /// </summary>
-    /// <param name="strm">An initialized compression stream.</param>
-    /// <param name="dictionary">A pointer to the compression dictionary.</param>
-    /// <param name="dictLength">The number of bytes available in the compression dictionary pointed to by <paramref name="dictionary"/>.</param>
-    /// <returns><see cref="Z_OK"/> if success, or <see cref="Z_STREAM_ERROR"/> if a parameter is invalid (e.g. <paramref name="dictionary"/> being <see langword="null"/>) or the stream state is inconsistent (for example if <see cref="Deflate(ZStream, int)"/> has already been called for this stream or if not at a block boundary for raw deflate).</returns>
-    /// <remarks>Upon return of this method, the <see cref="ZStream.Adler"/> property of the <paramref name="strm"/> is set to the Adler-32 value of the dictionary; the decompressor may later use this value to determine which dictionary has been used by the compressor.</remarks>
-#pragma warning disable CA1062
-    public unsafe int DeflateSetDictionary(Unsafe.ZStream strm, byte* dictionary, uint dictLength) => Deflater.DeflateSetDictionary(strm, dictionary, dictLength);
-#pragma warning restore CA1062
 
     /// <summary>
     /// Dynamically updates the compression level and compression strategy of a stream.
@@ -344,12 +334,13 @@ public partial class ZLib : IZLib, Unsafe.IZLib
 
         unsafe
         {
-            fixed (byte* dict = dictionary, input = strm.Input, output = strm.Output)
+            fixed (byte* input = strm.Input, output = strm.Output)
             {
                 unsafeStrm.NextIn = input + strm.inputOffset;
                 unsafeStrm.NextOut = output + strm.outputOffset;
 
-                int ret = Inflater.InflateSetDictionary(unsafeStrm, dict, (uint)length);
+                ref byte dict = ref MemoryMarshal.GetReference(dictionary.AsSpan());
+                int ret = Inflater.InflateSetDictionary(unsafeStrm, ref dict, (uint)length);
 
                 strm.inputOffset = (int)(unsafeStrm.NextIn - input);
                 strm.outputOffset = (int)(unsafeStrm.NextOut - output);
@@ -358,19 +349,6 @@ public partial class ZLib : IZLib, Unsafe.IZLib
             }
         }
     }
-
-    /// <summary>
-    /// Initializes the decompression dictionary from the given uncompressed byte sequence.
-    /// <para>This method must be called immediately after a call of <see cref="Inflate(ZStream, int)"/>, if that call returned <see cref="Z_NEED_DICT"/>. The dictionary chosen by the compressor can be determined from the Adler-32 value returned by that call of <see cref="Inflate(ZStream, int)"/>. The compressor and decompressor must use exactly the same dictionary (see <see cref="DeflateSetDictionary(Unsafe.ZStream, byte*, uint)"/>).  For raw inflate, this function can be called at any time to set the dictionary. If the provided dictionary is smaller than the window and there is already data in the window, then the provided dictionary will amend what's there. The application must insure that the dictionary that was used for compression is provided.</para>
-    /// </summary>
-    /// <param name="strm">An initialized decompression stream.</param>
-    /// <param name="dictionary">A pointer to the decompression dictionary.</param>
-    /// <param name="dictLength">The number of bytes available in the decompression dictionary pointed to by <paramref name="dictionary"/>.</param>
-    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_STREAM_ERROR"/> if a parameter is invalid (e.g. <paramref name="dictionary"/> being <see langword="null"/>) or the stream state is inconsistent, <see cref="Z_DATA_ERROR"/> if the given dictionary doesn't match the expected one (incorrect Adler-32 value).</returns>
-    /// <remarks>This method does not perform any decompression: this will be done by subsequent calls of <see cref="Inflate(ZStream, int)"/>.</remarks>
-#pragma warning disable CA1062
-    public unsafe int InflateSetDictionary(Unsafe.ZStream strm, byte* dictionary, uint dictLength) => Inflater.InflateSetDictionary(strm, dictionary, dictLength);
-#pragma warning restore CA1062
 
     /// <summary>
     /// Skips invalid compressed data until a possible full flush point can be found, or until all available input is skipped. No output is provided.
@@ -630,21 +608,6 @@ public partial class ZLib : IZLib, Unsafe.IZLib
     /// <param name="adler">The checksum to be updated.</param>
     /// <param name="buf">The bytes of data to be added to the checksum.</param>
     /// <returns>An Adler-32 checksum.</returns>
-    public uint Adler32(uint adler, ReadOnlySpan<byte> buf)
-    {
-        unsafe
-        {
-            fixed (byte* data = buf)
-                return Adler.Update(adler, data, (uint)buf.Length);
-        }
-    }
-
-    /// <summary>
-    /// Updates a running Adler-32 checksum and returns the updated checksum.
-    /// </summary>
-    /// <param name="adler">The checksum to be updated.</param>
-    /// <param name="buf">A pointer to <paramref name="len"/> bytes of data to be added to the checksum.</param>
-    /// <param name="len">The number of bytes starting from <paramref name="buf"/> to be added to the checksum.</param>
-    /// <returns>An Adler-32 checksum.</returns>
-    public unsafe uint Adler32(uint adler, byte* buf, uint len) => Adler.Update(adler, buf, len);
+    public uint Adler32(uint adler, ReadOnlySpan<byte> buf) =>
+        Adler.Update(adler, ref MemoryMarshal.GetReference(buf), (uint)buf.Length);
 }

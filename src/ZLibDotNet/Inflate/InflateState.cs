@@ -31,11 +31,11 @@ internal class InflateState
     internal uint extra;            // extra bits needed
     internal Code[] lencode;        // starting table for length/literal codes
     internal Code[] distcode;       // starting table for distance codes
-    internal uint lenbits;          // index bits for lencode
-    internal uint distbits;         // index bits for distcode
+    internal int lenbits;           // index bits for lencode
+    internal int distbits;          // index bits for distcode
     internal uint ncode;            // number of code length code lengths
-    internal uint nlen;             // number of length code lengths
-    internal uint ndist;            // number of distance code lengths
+    internal int nlen;              // number of length code lengths
+    internal int ndist;             // number of distance code lengths
     internal uint have;             // number of code lengths in lens[]
     internal int next;              // next available space in codes[]
     internal int diststart;         // starting index in codes[] for distance codes

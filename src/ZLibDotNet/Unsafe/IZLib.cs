@@ -91,16 +91,6 @@ public interface IZLib
     int InflateEnd(ZStream strm);
 
     /// <summary>
-    /// Initializes the compression dictionary from the given byte sequence without producing any compressed output.
-    /// </summary>
-    /// <param name="strm">An initialized compression stream.</param>
-    /// <param name="dictionary">A pointer to the compression dictionary.</param>
-    /// <param name="dictLength">The number of bytes available in the compression dictionary pointed to by <paramref name="dictionary"/>.</param>
-    /// <returns><see cref="Z_OK"/> if success, or <see cref="Z_STREAM_ERROR"/> if a parameter is invalid (e.g. <paramref name="dictionary"/> being <see langword="null"/>) or the stream state is inconsistent (for example if <see cref="Deflate(ZStream, int)"/> has already been called for this stream or if not at a block boundary for raw deflate).</returns>
-    /// <remarks>Upon return of this method, the <see cref="ZStream.Adler"/> property of the <paramref name="strm"/> is set to the Adler-32 value of the dictionary; the decompressor may later use this value to determine which dictionary has been used by the compressor.</remarks>
-    unsafe int DeflateSetDictionary(ZStream strm, byte* dictionary, uint dictLength);
-
-    /// <summary>
     /// Dynamically updates the compression level and compression strategy of a stream.
     /// </summary>
     /// <param name="strm">The stream to be updated.</param>
@@ -108,17 +98,6 @@ public interface IZLib
     /// <param name="strategy">The strategy. Used to tune the compression algorithm. Use the value <see cref="Z_DEFAULT_STRATEGY" /> for normal data, <see cref="Z_FILTERED" /> for data produced by a filter (or predictor), <see cref="Z_HUFFMAN_ONLY" /> to force Huffman encoding only (no string match), or <see cref="Z_RLE" /> to limit match distances to one (run-length encoding).</param>
     /// <returns><see cref="Z_OK"/> on success, <see cref="Z_STREAM_ERROR"/> if the source stream state was inconsistent or if a parameter was invalid, or <see cref="Z_BUF_ERROR"/> if there was not enough output space to complete the compression of the available input data before a change in the strategy or approach.</returns>
     int DeflateParams(ZStream strm, int level, int strategy);
-
-    /// <summary>
-    /// Initializes the decompression dictionary from the given uncompressed byte sequence.
-    /// <para>This method must be called immediately after a call of <see cref="Inflate(ZStream, int)"/>, if that call returned <see cref="Z_NEED_DICT"/>. The dictionary chosen by the compressor can be determined from the Adler-32 value returned by that call of <see cref="Inflate(ZStream, int)"/>. The compressor and decompressor must use exactly the same dictionary (see <see cref="DeflateSetDictionary(ZStream, byte*, uint)"/>).  For raw inflate, this function can be called at any time to set the dictionary. If the provided dictionary is smaller than the window and there is already data in the window, then the provided dictionary will amend what's there. The application must insure that the dictionary that was used for compression is provided.</para>
-    /// </summary>
-    /// <param name="strm">An initialized decompression stream.</param>
-    /// <param name="dictionary">A pointer to the decompression dictionary.</param>
-    /// <param name="dictLength">The number of bytes available in the decompression dictionary pointed to by <paramref name="dictionary"/>.</param>
-    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_STREAM_ERROR"/> if a parameter is invalid (e.g. <paramref name="dictionary"/> being <see langword="null"/>) or the stream state is inconsistent, <see cref="Z_DATA_ERROR"/> if the given dictionary doesn't match the expected one (incorrect Adler-32 value).</returns>
-    /// <remarks>This method does not perform any decompression: this will be done by subsequent calls of <see cref="Inflate(ZStream, int)"/>.</remarks>
-    unsafe int InflateSetDictionary(ZStream strm, byte* dictionary, uint dictLength);
 
     /// <summary>
     /// Skips invalid compressed data until a possible full flush point can be found, or until all available input is skipped. No output is provided.
@@ -212,13 +191,4 @@ public interface IZLib
     /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer, or <see cref="Z_DATA_ERROR"/> if the input data was corrupted or incomplete.</returns>
     /// <remarks>In the case where there is not enough room, the method will fill the destination buffer with the uncompressed data up to that point.</remarks>
     unsafe int Uncompress(byte* dest, uint* destLen, byte* source, uint* sourceLen);
-
-    /// <summary>
-    /// Updates a running Adler-32 checksum and returns the updated checksum.
-    /// </summary>
-    /// <param name="adler">The checksum to be updated.</param>
-    /// <param name="buf">A pointer to <paramref name="len"/> bytes of data to be added to the checksum.</param>
-    /// <param name="len">The number of bytes starting from <paramref name="buf"/> to be added to the checksum.</param>
-    /// <returns>An Adler-32 checksum.</returns>
-    unsafe uint Adler32(uint adler, byte* buf, uint len);
 }

@@ -33,10 +33,7 @@ internal static partial class Deflater
 
         s.status = InitState;
 
-        unsafe
-        {
-            strm.Adler = Adler32.Update(0, null, 0);
-        }
+        strm.Adler = Adler32.Update(0, ref netUnsafe.NullRef<byte>(), 0);
 
         s.last_flush = -2;
 

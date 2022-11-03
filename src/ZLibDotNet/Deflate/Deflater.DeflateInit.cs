@@ -54,27 +54,27 @@ internal static partial class Deflater
             s.status = InitState; // to pass state test in DeflateReset()
 
             s.wrap = wrap;
-            s.w_bits = (uint)windowBits;
-            s.w_size = (uint)(1 << windowBits);
+            s.w_bits = windowBits;
+            s.w_size = 1 << windowBits;
             s.w_mask = s.w_size - 1;
 
             int hash_bits = memLevel + 7;
-            s.hash_bits = (uint)hash_bits;
-            s.hash_size = (uint)(1 << hash_bits);
+            s.hash_bits = hash_bits;
+            s.hash_size = 1 << hash_bits;
             s.hash_mask = s.hash_size - 1;
             s.hash_shift = (s.hash_bits + MinMatch - 1) / MinMatch;
 
-            int w_size = (int)s.w_size;
+            int w_size = s.w_size;
             s.window = ArrayPool<byte>.Shared.Rent(w_size * 2);
             s.prev = ArrayPool<ushort>.Shared.Rent(w_size);
-            s.head = ArrayPool<ushort>.Shared.Rent((int)s.hash_size);
+            s.head = ArrayPool<ushort>.Shared.Rent(s.hash_size);
 
             s.high_water = 0; // nothing written to s.window yet
 
-            s.lit_bufsize = (uint)(1 << (memLevel + 6)); // 16K elements by default
+            s.lit_bufsize = 1 << (memLevel + 6); // 16K elements by default
 
             s.pending_buf_size = s.lit_bufsize * 4;
-            s.pending_buf = ArrayPool<byte>.Shared.Rent((int)s.pending_buf_size);
+            s.pending_buf = ArrayPool<byte>.Shared.Rent(s.pending_buf_size);
         }
         catch (OutOfMemoryException)
         {

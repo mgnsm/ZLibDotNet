@@ -123,532 +123,532 @@ internal static partial class Inflater
         uint len;           // length to copy for repeats, bits to drop
         int ret = Z_OK;
 
-        fixed (ushort* lens = state.lens, work = state.work)
-        fixed (byte* window = state.window)
-        {
-            for (; ; )
-                switch (state.mode)
-                {
-                    case InflateMode.Head:
-                        if (state.wrap == 0)
-                        {
-                            state.mode = InflateMode.Typedo;
-                            break;
-                        }
-                        if (!x.NeedBits(16))
-                            goto inf_leave;
-                        if (((x.Bits(8) << 8) + (x.hold >> 8)) % 31 != 0)
-                        {
-                            strm.msg = "incorrect header check";
-                            state.mode = InflateMode.Bad;
-                            break;
-                        }
-                        if (x.Bits(4) != Z_DEFLATED)
-                        {
-                            strm.msg = "unknown compression method";
-                            state.mode = InflateMode.Bad;
-                            break;
-                        }
-                        x.DropBits(4);
-                        len = x.Bits(4) + 8;
-                        if (state.wbits == 0)
-                            state.wbits = len;
-                        if (len > 15 || len > state.wbits)
-                        {
-                            strm.msg = "invalid window size";
-                            state.mode = InflateMode.Bad;
-                            break;
-                        }
-                        state.dmax = (uint)(1 << (int)len);
-                        state.flags = 0; // indicate zlib header
-                        Trace.Tracev("inflate:   zlib header ok\n");
-                        strm.Adler = state.check = Adler32.Update(0, null, 0);
-                        state.mode = (x.hold & 0x200) != 0 ? InflateMode.DictId : InflateMode.Type;
-                        x.InitBits();
+        ref ushort lens = ref MemoryMarshal.GetReference(state.lens.AsSpan());
+        ref ushort work = ref MemoryMarshal.GetReference(state.work.AsSpan());
+        ref byte window = ref MemoryMarshal.GetReference(state.window.AsSpan());
+        for (; ; )
+            switch (state.mode)
+            {
+                case InflateMode.Head:
+                    if (state.wrap == 0)
+                    {
+                        state.mode = InflateMode.Typedo;
                         break;
-                    case InflateMode.DictId:
-                        if (!x.NeedBits(32))
-                            goto inf_leave;
-                        strm.Adler = state.check = ZSwap32(x.hold);
-                        x.InitBits();
-                        state.mode = InflateMode.Dict;
-                        goto case InflateMode.Dict;
-                    case InflateMode.Dict:
-                        if (state.havedict == 0)
-                        {
-                            x.Restore();
-                            return Z_NEED_DICT;
-                        }
-                        strm.Adler = state.check = Adler32.Update(0, null, 0);
-                        state.mode = InflateMode.Type;
-                        goto case InflateMode.Type;
-                    case InflateMode.Type:
-                        if (flush == Z_BLOCK || flush == Z_TREES)
-                            goto inf_leave;
-                        goto case InflateMode.Typedo;
-                    case InflateMode.Typedo:
-                        if (state.last != 0)
-                        {
-                            x.ByteBits();
-                            state.mode = InflateMode.Check;
+                    }
+                    if (!x.NeedBits(16))
+                        goto inf_leave;
+                    if (((x.Bits(8) << 8) + (x.hold >> 8)) % 31 != 0)
+                    {
+                        strm.msg = "incorrect header check";
+                        state.mode = InflateMode.Bad;
+                        break;
+                    }
+                    if (x.Bits(4) != Z_DEFLATED)
+                    {
+                        strm.msg = "unknown compression method";
+                        state.mode = InflateMode.Bad;
+                        break;
+                    }
+                    x.DropBits(4);
+                    len = x.Bits(4) + 8;
+                    if (state.wbits == 0)
+                        state.wbits = len;
+                    if (len > 15 || len > state.wbits)
+                    {
+                        strm.msg = "invalid window size";
+                        state.mode = InflateMode.Bad;
+                        break;
+                    }
+                    state.dmax = (uint)(1 << (int)len);
+                    state.flags = 0; // indicate zlib header
+                    Trace.Tracev("inflate:   zlib header ok\n");
+                    strm.Adler = state.check = Adler32.Update(0, ref netUnsafe.NullRef<byte>(), 0);
+                    state.mode = (x.hold & 0x200) != 0 ? InflateMode.DictId : InflateMode.Type;
+                    x.InitBits();
+                    break;
+                case InflateMode.DictId:
+                    if (!x.NeedBits(32))
+                        goto inf_leave;
+                    strm.Adler = state.check = ZSwap32(x.hold);
+                    x.InitBits();
+                    state.mode = InflateMode.Dict;
+                    goto case InflateMode.Dict;
+                case InflateMode.Dict:
+                    if (state.havedict == 0)
+                    {
+                        x.Restore();
+                        return Z_NEED_DICT;
+                    }
+                    strm.Adler = state.check = Adler32.Update(0, ref netUnsafe.NullRef<byte>(), 0);
+                    state.mode = InflateMode.Type;
+                    goto case InflateMode.Type;
+                case InflateMode.Type:
+                    if (flush == Z_BLOCK || flush == Z_TREES)
+                        goto inf_leave;
+                    goto case InflateMode.Typedo;
+                case InflateMode.Typedo:
+                    if (state.last != 0)
+                    {
+                        x.ByteBits();
+                        state.mode = InflateMode.Check;
+                        break;
+                    }
+                    if (!x.NeedBits(3))
+                        goto inf_leave;
+                    state.last = (int)x.Bits(1);
+                    x.DropBits(1);
+                    switch (x.Bits(2))
+                    {
+                        case 0: // stored block
+                            Trace.Tracev($"inflate:     stored block{(state.last != 0 ? " (last)" : "")}\n");
+                            state.mode = InflateMode.Stored;
                             break;
-                        }
+                        case 1: // fixed block
+                            state.lencode = s_lenfix;
+                            state.lenbits = 9;
+                            state.diststart = default;
+                            state.distcode = s_distfix;
+                            state.distbits = 5;
+                            Trace.Tracev($"inflate:     fixed codes block{(state.last != 0 ? " (last)" : "")}\n");
+                            state.mode = InflateMode.Len_; // decode codes
+                            if (flush == Z_TREES)
+                            {
+                                x.DropBits(2);
+                                goto inf_leave;
+                            }
+                            break;
+                        case 2: // dynamic block
+                            Trace.Tracev($"inflate:     dynamic codes block{(state.last != 0 ? "(last)" : "")}\n");
+                            state.mode = InflateMode.Table;
+                            break;
+                        case 3:
+                            strm.msg = "invalid block type";
+                            state.mode = InflateMode.Bad;
+                            break;
+                    }
+                    x.DropBits(2);
+                    break;
+                case InflateMode.Stored:
+                    x.ByteBits(); // go to byte boundary
+                    if (!x.NeedBits(32))
+                        goto inf_leave;
+                    if ((x.hold & 0xffff) != ((x.hold >> 16) ^ 0xffff))
+                    {
+                        strm.msg = "invalid stored block lengths";
+                        state.mode = InflateMode.Bad;
+                        break;
+                    }
+                    state.length = x.hold & 0xffff;
+                    Trace.Tracev($"inflate:       stored length {state.length}\n");
+                    x.InitBits();
+                    state.mode = InflateMode.Copy_;
+                    if (flush == Z_TREES)
+                        goto inf_leave;
+                    goto case InflateMode.Copy_;
+                case InflateMode.Copy_:
+                    state.mode = InflateMode.Copy;
+                    goto case InflateMode.Copy;
+                case InflateMode.Copy:
+                    copy = state.length;
+                    if (copy != 0)
+                    {
+                        if (copy > x.have)
+                            copy = x.have;
+                        if (copy > x.left)
+                            copy = x.left;
+                        if (copy == 0)
+                            goto inf_leave;
+                        Buffer.MemoryCopy(x.next, x.put, copy, copy);
+                        x.have -= copy;
+                        x.next += copy;
+                        x.left -= copy;
+                        x.put += copy;
+                        state.length -= copy;
+                        break;
+                    }
+                    Trace.Tracev("inflate:       stored end\n");
+                    state.mode = InflateMode.Type;
+                    break;
+                case InflateMode.Table:
+                    if (!x.NeedBits(14))
+                        goto inf_leave;
+                    state.nlen = (int)x.Bits(5) + 257;
+                    x.DropBits(5);
+                    state.ndist = (int)x.Bits(5) + 1;
+                    x.DropBits(5);
+                    state.ncode = x.Bits(4) + 4;
+                    x.DropBits(4);
+                    if (state.nlen > 286 || state.ndist > 30)
+                    {
+                        strm.msg = "too many length or distance symbols";
+                        state.mode = InflateMode.Bad;
+                        break;
+                    }
+                    Trace.Tracev("inflate:       table sizes ok\n");
+                    state.have = 0;
+                    state.mode = InflateMode.LenLens;
+                    goto case InflateMode.LenLens;
+                case InflateMode.LenLens:
+                    while (state.have < state.ncode)
+                    {
                         if (!x.NeedBits(3))
                             goto inf_leave;
-                        state.last = (int)x.Bits(1);
-                        x.DropBits(1);
-                        switch (x.Bits(2))
-                        {
-                            case 0: // stored block
-                                Trace.Tracev($"inflate:     stored block{(state.last != 0 ? " (last)" : "")}\n");
-                                state.mode = InflateMode.Stored;
-                                break;
-                            case 1: // fixed block
-                                state.lencode = s_lenfix;
-                                state.lenbits = 9;
-                                state.diststart = default;
-                                state.distcode = s_distfix;
-                                state.distbits = 5;
-                                Trace.Tracev($"inflate:     fixed codes block{(state.last != 0 ? " (last)" : "")}\n");
-                                state.mode = InflateMode.Len_; // decode codes
-                                if (flush == Z_TREES)
-                                {
-                                    x.DropBits(2);
-                                    goto inf_leave;
-                                }
-                                break;
-                            case 2: // dynamic block
-                                Trace.Tracev($"inflate:     dynamic codes block{(state.last != 0 ? "(last)" : "")}\n");
-                                state.mode = InflateMode.Table;
-                                break;
-                            case 3:
-                                strm.msg = "invalid block type";
-                                state.mode = InflateMode.Bad;
-                                break;
-                        }
-                        x.DropBits(2);
+                        state.lens[s_order[state.have++]] = (ushort)x.Bits(3);
+                        x.DropBits(3);
+                    }
+                    while (state.have < 19)
+                        state.lens[s_order[state.have++]] = 0;
+                    state.next = 0;
+                    state.lencode = state.codes;
+                    state.lenbits = 7;
+                    ret = InflateTable(CodeType.Codes, ref lens, 19, ref MemoryMarshal.GetReference(state.codes.AsSpan()), ref state.lenbits, ref work, ref state.next);
+                    if (ret != 0)
+                    {
+                        strm.msg = "invalid code lengths set";
+                        state.mode = InflateMode.Bad;
                         break;
-                    case InflateMode.Stored:
-                        x.ByteBits(); // go to byte boundary
-                        if (!x.NeedBits(32))
-                            goto inf_leave;
-                        if ((x.hold & 0xffff) != ((x.hold >> 16) ^ 0xffff))
+                    }
+                    Trace.Tracev("inflate:       code lengths ok\n");
+                    state.have = 0;
+                    state.mode = InflateMode.CodeLens;
+                    goto case InflateMode.CodeLens;
+                case InflateMode.CodeLens:
+                    while (state.have < state.nlen + state.ndist)
+                    {
+                        for (; ; )
                         {
-                            strm.msg = "invalid stored block lengths";
-                            state.mode = InflateMode.Bad;
-                            break;
-                        }
-                        state.length = x.hold & 0xffff;
-                        Trace.Tracev($"inflate:       stored length {state.length}\n");
-                        x.InitBits();
-                        state.mode = InflateMode.Copy_;
-                        if (flush == Z_TREES)
-                            goto inf_leave;
-                        goto case InflateMode.Copy_;
-                    case InflateMode.Copy_:
-                        state.mode = InflateMode.Copy;
-                        goto case InflateMode.Copy;
-                    case InflateMode.Copy:
-                        copy = state.length;
-                        if (copy != 0)
-                        {
-                            if (copy > x.have)
-                                copy = x.have;
-                            if (copy > x.left)
-                                copy = x.left;
-                            if (copy == 0)
+                            here = state.lencode[x.Bits(state.lenbits)];
+                            if (here.bits <= x.bits)
+                                break;
+                            if (!x.PullByte())
                                 goto inf_leave;
-                            Buffer.MemoryCopy(x.next, x.put, copy, copy);
-                            x.have -= copy;
-                            x.next += copy;
-                            x.left -= copy;
-                            x.put += copy;
-                            state.length -= copy;
-                            break;
                         }
-                        Trace.Tracev("inflate:       stored end\n");
-                        state.mode = InflateMode.Type;
-                        break;
-                    case InflateMode.Table:
-                        if (!x.NeedBits(14))
-                            goto inf_leave;
-                        state.nlen = x.Bits(5) + 257;
-                        x.DropBits(5);
-                        state.ndist = x.Bits(5) + 1;
-                        x.DropBits(5);
-                        state.ncode = x.Bits(4) + 4;
-                        x.DropBits(4);
-                        if (state.nlen > 286 || state.ndist > 30)
+                        if (here.val < 16)
                         {
-                            strm.msg = "too many length or distance symbols";
-                            state.mode = InflateMode.Bad;
-                            break;
+                            x.DropBits(here.bits);
+                            state.lens[state.have++] = here.val;
                         }
-                        Trace.Tracev("inflate:       table sizes ok\n");
-                        state.have = 0;
-                        state.mode = InflateMode.LenLens;
-                        goto case InflateMode.LenLens;
-                    case InflateMode.LenLens:
-                        while (state.have < state.ncode)
+                        else
                         {
-                            if (!x.NeedBits(3))
-                                goto inf_leave;
-                            state.lens[s_order[state.have++]] = (ushort)x.Bits(3);
-                            x.DropBits(3);
-                        }
-                        while (state.have < 19)
-                            state.lens[s_order[state.have++]] = 0;
-                        state.next = 0;
-                        state.lencode = state.codes;
-                        state.lenbits = 7;
-                        ret = InflateTable(CodeType.Codes, lens, 19, ref MemoryMarshal.GetReference(state.codes.AsSpan()), ref state.lenbits, work, ref state.next);
-                        if (ret != 0)
-                        {
-                            strm.msg = "invalid code lengths set";
-                            state.mode = InflateMode.Bad;
-                            break;
-                        }
-                        Trace.Tracev("inflate:       code lengths ok\n");
-                        state.have = 0;
-                        state.mode = InflateMode.CodeLens;
-                        goto case InflateMode.CodeLens;
-                    case InflateMode.CodeLens:
-                        while (state.have < state.nlen + state.ndist)
-                        {
-                            for (; ; )
+                            if (here.val == 16)
                             {
-                                here = state.lencode[x.Bits((int)state.lenbits)];
-                                if (here.bits <= x.bits)
-                                    break;
-                                if (!x.PullByte())
+                                if (!x.NeedBits(here.bits + 2))
                                     goto inf_leave;
-                            }
-                            if (here.val < 16)
-                            {
                                 x.DropBits(here.bits);
-                                state.lens[state.have++] = here.val;
-                            }
-                            else
-                            {
-                                if (here.val == 16)
-                                {
-                                    if (!x.NeedBits(here.bits + 2))
-                                        goto inf_leave;
-                                    x.DropBits(here.bits);
-                                    if (state.have == 0)
-                                    {
-                                        strm.msg = "invalid bit length repeat";
-                                        state.mode = InflateMode.Bad;
-                                        break;
-                                    }
-                                    len = state.lens[state.have - 1];
-                                    copy = 3 + x.Bits(2);
-                                    x.DropBits(2);
-                                }
-                                else if (here.val == 17)
-                                {
-                                    if (!x.NeedBits(here.bits + 3))
-                                        goto inf_leave;
-                                    x.DropBits(here.bits);
-                                    len = 0;
-                                    copy = 3 + x.Bits(3);
-                                    x.DropBits(3);
-                                }
-                                else
-                                {
-                                    if (!x.NeedBits(here.bits + 7))
-                                        goto inf_leave;
-                                    x.DropBits(here.bits);
-                                    len = 0;
-                                    copy = 11 + x.Bits(7);
-                                    x.DropBits(7);
-                                }
-                                if (state.have + copy > state.nlen + state.ndist)
+                                if (state.have == 0)
                                 {
                                     strm.msg = "invalid bit length repeat";
                                     state.mode = InflateMode.Bad;
                                     break;
                                 }
-                                while (copy-- != 0)
-                                    state.lens[state.have++] = (ushort)len;
+                                len = state.lens[state.have - 1];
+                                copy = 3 + x.Bits(2);
+                                x.DropBits(2);
                             }
-                        }
-
-                        // handle error breaks in while
-                        if (state.mode == InflateMode.Bad)
-                            break;
-
-                        // check for end-of-block code (better have one)
-                        if (state.lens[256] == 0)
-                        {
-                            strm.msg = "invalid code -- missing end-of-block";
-                            state.mode = InflateMode.Bad;
-                            break;
-                        }
-
-                        // build code tables
-                        state.next = 0;
-                        state.lencode = state.codes;
-                        state.lenbits = 9;
-                        ref Code codes = ref MemoryMarshal.GetReference(state.codes.AsSpan());
-                        ret = InflateTable(CodeType.Lens, lens, state.nlen, ref codes, ref state.lenbits, work, ref state.next);
-                        if (ret != 0)
-                        {
-                            strm.msg = "invalid literal/lengths set";
-                            state.mode = InflateMode.Bad;
-                            break;
-                        }
-                        state.distcode = state.codes;
-                        state.diststart = state.next;
-                        state.distbits = 6;
-                        codes = ref netUnsafe.Add(ref codes, state.next);
-                        ret = InflateTable(CodeType.Dists, lens + state.nlen, state.ndist, ref codes, ref state.distbits, work, ref state.next);
-                        if (ret != 0)
-                        {
-                            strm.msg = "invalid distances set";
-                            state.mode = InflateMode.Bad;
-                            break;
-                        }
-                        Trace.Tracev("inflate:       codes ok\n");
-                        state.mode = InflateMode.Len_;
-                        if (flush == Z_TREES)
-                            goto inf_leave;
-                        goto case InflateMode.Len_;
-                    case InflateMode.Len_:
-                        state.mode = InflateMode.Len;
-                        goto case InflateMode.Len;
-                    case InflateMode.Len:
-                        if (x.have >= 6 && x.left >= 258)
-                        {
-                            x.Restore();
-                            InflateFast(strm, @out);
-                            x.Load();
-#pragma warning disable CA1508
-                            if (state.mode == InflateMode.Type)
-                                state.back = -1;
-#pragma warning restore CA1508
-                            break;
-                        }
-                        state.back = 0;
-                        for (; ; )
-                        {
-                            here = state.lencode[x.Bits((int)state.lenbits)];
-                            if (here.bits <= x.bits)
-                                break;
-                            if (!x.PullByte())
-                                goto inf_leave;
-                        }
-                        if (here.op > 0 && (here.op & 0xf0) == 0)
-                        {
-                            last = here;
-                            for (; ; )
+                            else if (here.val == 17)
                             {
-                                here = state.lencode[last.val + (x.Bits(last.bits + last.op) >> last.bits)];
-                                if ((uint)(last.bits + here.bits) <= x.bits)
-                                    break;
-                                if (!x.PullByte())
+                                if (!x.NeedBits(here.bits + 3))
                                     goto inf_leave;
-                            }
-                            x.DropBits(last.bits);
-                            state.back += last.bits;
-                        }
-                        x.DropBits(here.bits);
-                        state.back += here.bits;
-                        state.length = here.val;
-                        if (here.op == 0)
-                        {
-                            Trace.Tracevv(here.val >= 0x20 && here.val < 0x7f ?
-                                $"inflate:         literal '{Convert.ToChar(here.val)}'\n" :
-                                $"inflate:         literal 0x{here.val:X2}\n");
-                            state.mode = InflateMode.Lit;
-                            break;
-                        }
-                        if ((here.op & 32) != 0)
-                        {
-                            Trace.Tracevv("inflate:         end of block\n");
-                            state.back = -1;
-                            state.mode = InflateMode.Type;
-                            break;
-                        }
-                        if ((here.op & 64) != 0)
-                        {
-                            strm.msg = "invalid literal/length code";
-                            state.mode = InflateMode.Bad;
-                            break;
-                        }
-                        state.extra = (uint)here.op & 15;
-                        state.mode = InflateMode.LenExt;
-                        goto case InflateMode.LenExt;
-                    case InflateMode.LenExt:
-                        if (state.extra != 0)
-                        {
-                            if (!x.NeedBits((int)state.extra))
-                                goto inf_leave;
-                            state.length += x.Bits((int)state.extra);
-                            x.DropBits((int)state.extra);
-                            state.back += (int)state.extra;
-                        }
-                        Trace.Tracevv($"inflate:         length {state.length}\n");
-                        state.was = state.length;
-                        state.mode = InflateMode.Dist;
-                        goto case InflateMode.Dist;
-                    case InflateMode.Dist:
-                        for (; ; )
-                        {
-                            here = state.distcode[state.diststart + x.Bits((int)state.distbits)];
-                            if (here.bits <= x.bits)
-                                break;
-                            if (!x.PullByte())
-                                goto inf_leave;
-                        }
-                        if ((here.op & 0xf0) == 0)
-                        {
-                            last = here;
-                            for (; ; )
-                            {
-                                here = state.distcode[state.diststart + last.val +
-                                    (x.Bits(last.bits + last.op) >> last.bits)];
-                                if ((uint)(last.bits + here.bits) <= x.bits)
-                                    break;
-                                if (!x.PullByte())
-                                    goto inf_leave;
-                            }
-                            x.DropBits(last.bits);
-                            state.back += last.bits;
-                        }
-                        x.DropBits(here.bits);
-                        state.back += here.bits;
-                        if ((here.op & 64) != 0)
-                        {
-                            strm.msg = "invalid distance code";
-                            state.mode = InflateMode.Bad;
-                            break;
-                        }
-                        state.offset = here.val;
-                        state.extra = (uint)here.op & 15;
-                        state.mode = InflateMode.DistExt;
-                        goto case InflateMode.DistExt;
-                    case InflateMode.DistExt:
-                        if (state.extra != 0)
-                        {
-                            if (!x.NeedBits((int)state.extra))
-                                goto inf_leave;
-                            state.offset += x.Bits((int)state.extra);
-                            x.DropBits((int)state.extra);
-                            state.back += (int)state.extra;
-                        }
-                        Trace.Tracevv($"inflate:         distance {state.offset}\n");
-                        state.mode = InflateMode.Match;
-                        goto case InflateMode.Match;
-                    case InflateMode.Match:
-                        if (x.left == 0)
-                            goto inf_leave;
-                        copy = @out - x.left;
-                        if (state.offset > copy) // copy from window
-                        {
-                            copy = state.offset - copy;
-                            if (copy > state.whave && state.sane != 0)
-                            {
-                                strm.msg = "invalid distance too far back";
-                                state.mode = InflateMode.Bad;
-                                break;
-                            }
-                            if (copy > state.wnext)
-                            {
-                                copy -= state.wnext;
-                                from = window + (state.wsize - copy);
+                                x.DropBits(here.bits);
+                                len = 0;
+                                copy = 3 + x.Bits(3);
+                                x.DropBits(3);
                             }
                             else
-                                from = window + (state.wnext - copy);
-                            if (copy > state.length)
-                                copy = state.length;
-                        }
-                        else // copy from output
-                        {
-                            from = x.put - state.offset;
-                            copy = state.length;
-                        }
-                        if (copy > x.left)
-                            copy = x.left;
-                        x.left -= copy;
-                        state.length -= copy;
-                        do
-                        {
-                            *x.put++ = *from++;
-                        } while (--copy != 0);
-                        if (state.length == 0)
-                            state.mode = InflateMode.Len;
-                        break;
-                    case InflateMode.Lit:
-                        if (x.left == 0)
-                            goto inf_leave;
-                        *x.put++ = (byte)state.length;
-                        x.left--;
-                        state.mode = InflateMode.Len;
-                        break;
-                    case InflateMode.Check:
-                        if (state.wrap != 0)
-                        {
-                            if (!x.NeedBits(32))
-                                goto inf_leave;
-                            @out -= x.left;
-                            strm.total_out += @out;
-                            state.total += @out;
-                            if ((state.wrap & 4) != 0 && @out != 0)
-                                strm.Adler = state.check = Adler32.Update(state.check, x.put - @out, @out);
-                            @out = x.left;
-                            if ((state.wrap & 4) != 0 && ZSwap32(x.hold) != state.check)
                             {
-                                strm.msg = "incorrect data check";
+                                if (!x.NeedBits(here.bits + 7))
+                                    goto inf_leave;
+                                x.DropBits(here.bits);
+                                len = 0;
+                                copy = 11 + x.Bits(7);
+                                x.DropBits(7);
+                            }
+                            if (state.have + copy > state.nlen + state.ndist)
+                            {
+                                strm.msg = "invalid bit length repeat";
                                 state.mode = InflateMode.Bad;
                                 break;
                             }
-                            x.InitBits();
-                            Trace.Tracev("inflate:   check matches trailer\n");
+                            while (copy-- != 0)
+                                state.lens[state.have++] = (ushort)len;
                         }
-                        state.mode = InflateMode.Done;
-                        goto case InflateMode.Done;
-                    case InflateMode.Done:
-                        ret = Z_STREAM_END;
-                        goto inf_leave;
-                    case InflateMode.Bad:
-                        ret = Z_DATA_ERROR;
-                        goto inf_leave;
-                    case InflateMode.Mem:
-                        return Z_MEM_ERROR;
-                    case InflateMode.Sync:
-                    default:
-                        return Z_STREAM_ERROR;
-                }
+                    }
 
-            inf_leave:
-            x.Restore();
-            if (state.wsize != 0 || @out != strm.avail_out && state.mode < InflateMode.Bad &&
-                (state.mode < InflateMode.Check || flush != Z_FINISH))
-            {
-                try
-                {
-                    UpdateWindow(strm, x.put, @out - strm.avail_out);
-                }
-                catch (OutOfMemoryException)
-                {
-                    state.mode = InflateMode.Mem;
+                    // handle error breaks in while
+                    if (state.mode == InflateMode.Bad)
+                        break;
+
+                    // check for end-of-block code (better have one)
+                    if (state.lens[256] == 0)
+                    {
+                        strm.msg = "invalid code -- missing end-of-block";
+                        state.mode = InflateMode.Bad;
+                        break;
+                    }
+
+                    // build code tables
+                    state.next = 0;
+                    state.lencode = state.codes;
+                    state.lenbits = 9;
+                    ref Code codes = ref MemoryMarshal.GetReference(state.codes.AsSpan());
+                    ret = InflateTable(CodeType.Lens, ref lens, state.nlen, ref codes, ref state.lenbits, ref work, ref state.next);
+                    if (ret != 0)
+                    {
+                        strm.msg = "invalid literal/lengths set";
+                        state.mode = InflateMode.Bad;
+                        break;
+                    }
+                    state.distcode = state.codes;
+                    state.diststart = state.next;
+                    state.distbits = 6;
+                    codes = ref netUnsafe.Add(ref codes, state.next);
+                    ret = InflateTable(CodeType.Dists, ref netUnsafe.Add(ref lens, state.nlen), state.ndist, ref codes, ref state.distbits, ref work, ref state.next);
+                    if (ret != 0)
+                    {
+                        strm.msg = "invalid distances set";
+                        state.mode = InflateMode.Bad;
+                        break;
+                    }
+                    Trace.Tracev("inflate:       codes ok\n");
+                    state.mode = InflateMode.Len_;
+                    if (flush == Z_TREES)
+                        goto inf_leave;
+                    goto case InflateMode.Len_;
+                case InflateMode.Len_:
+                    state.mode = InflateMode.Len;
+                    goto case InflateMode.Len;
+                case InflateMode.Len:
+                    if (x.have >= 6 && x.left >= 258)
+                    {
+                        x.Restore();
+                        InflateFast(strm, @out);
+                        x.Load();
+#pragma warning disable CA1508
+                        if (state.mode == InflateMode.Type)
+                            state.back = -1;
+#pragma warning restore CA1508
+                        break;
+                    }
+                    state.back = 0;
+                    for (; ; )
+                    {
+                        here = state.lencode[x.Bits(state.lenbits)];
+                        if (here.bits <= x.bits)
+                            break;
+                        if (!x.PullByte())
+                            goto inf_leave;
+                    }
+                    if (here.op > 0 && (here.op & 0xf0) == 0)
+                    {
+                        last = here;
+                        for (; ; )
+                        {
+                            here = state.lencode[last.val + (x.Bits(last.bits + last.op) >> last.bits)];
+                            if ((uint)(last.bits + here.bits) <= x.bits)
+                                break;
+                            if (!x.PullByte())
+                                goto inf_leave;
+                        }
+                        x.DropBits(last.bits);
+                        state.back += last.bits;
+                    }
+                    x.DropBits(here.bits);
+                    state.back += here.bits;
+                    state.length = here.val;
+                    if (here.op == 0)
+                    {
+                        Trace.Tracevv(here.val >= 0x20 && here.val < 0x7f ?
+                            $"inflate:         literal '{Convert.ToChar(here.val)}'\n" :
+                            $"inflate:         literal 0x{here.val:X2}\n");
+                        state.mode = InflateMode.Lit;
+                        break;
+                    }
+                    if ((here.op & 32) != 0)
+                    {
+                        Trace.Tracevv("inflate:         end of block\n");
+                        state.back = -1;
+                        state.mode = InflateMode.Type;
+                        break;
+                    }
+                    if ((here.op & 64) != 0)
+                    {
+                        strm.msg = "invalid literal/length code";
+                        state.mode = InflateMode.Bad;
+                        break;
+                    }
+                    state.extra = (uint)here.op & 15;
+                    state.mode = InflateMode.LenExt;
+                    goto case InflateMode.LenExt;
+                case InflateMode.LenExt:
+                    if (state.extra != 0)
+                    {
+                        if (!x.NeedBits((int)state.extra))
+                            goto inf_leave;
+                        state.length += x.Bits((int)state.extra);
+                        x.DropBits((int)state.extra);
+                        state.back += (int)state.extra;
+                    }
+                    Trace.Tracevv($"inflate:         length {state.length}\n");
+                    state.was = state.length;
+                    state.mode = InflateMode.Dist;
+                    goto case InflateMode.Dist;
+                case InflateMode.Dist:
+                    for (; ; )
+                    {
+                        here = state.distcode[state.diststart + x.Bits(state.distbits)];
+                        if (here.bits <= x.bits)
+                            break;
+                        if (!x.PullByte())
+                            goto inf_leave;
+                    }
+                    if ((here.op & 0xf0) == 0)
+                    {
+                        last = here;
+                        for (; ; )
+                        {
+                            here = state.distcode[state.diststart + last.val +
+                                (x.Bits(last.bits + last.op) >> last.bits)];
+                            if ((uint)(last.bits + here.bits) <= x.bits)
+                                break;
+                            if (!x.PullByte())
+                                goto inf_leave;
+                        }
+                        x.DropBits(last.bits);
+                        state.back += last.bits;
+                    }
+                    x.DropBits(here.bits);
+                    state.back += here.bits;
+                    if ((here.op & 64) != 0)
+                    {
+                        strm.msg = "invalid distance code";
+                        state.mode = InflateMode.Bad;
+                        break;
+                    }
+                    state.offset = here.val;
+                    state.extra = (uint)here.op & 15;
+                    state.mode = InflateMode.DistExt;
+                    goto case InflateMode.DistExt;
+                case InflateMode.DistExt:
+                    if (state.extra != 0)
+                    {
+                        if (!x.NeedBits((int)state.extra))
+                            goto inf_leave;
+                        state.offset += x.Bits((int)state.extra);
+                        x.DropBits((int)state.extra);
+                        state.back += (int)state.extra;
+                    }
+                    Trace.Tracevv($"inflate:         distance {state.offset}\n");
+                    state.mode = InflateMode.Match;
+                    goto case InflateMode.Match;
+                case InflateMode.Match:
+                    if (x.left == 0)
+                        goto inf_leave;
+                    copy = @out - x.left;
+                    if (state.offset > copy) // copy from window
+                    {
+                        copy = state.offset - copy;
+                        if (copy > state.whave && state.sane != 0)
+                        {
+                            strm.msg = "invalid distance too far back";
+                            state.mode = InflateMode.Bad;
+                            break;
+                        }
+                        if (copy > state.wnext)
+                        {
+                            copy -= state.wnext;
+                            from = (byte*)netUnsafe.AsPointer(ref window) + (state.wsize - copy);
+                        }
+                        else
+                            from = (byte*)netUnsafe.AsPointer(ref window) + (state.wnext - copy);
+                        if (copy > state.length)
+                            copy = state.length;
+                    }
+                    else // copy from output
+                    {
+                        from = x.put - state.offset;
+                        copy = state.length;
+                    }
+                    if (copy > x.left)
+                        copy = x.left;
+                    x.left -= copy;
+                    state.length -= copy;
+                    do
+                    {
+                        *x.put++ = *from++;
+                    } while (--copy != 0);
+                    if (state.length == 0)
+                        state.mode = InflateMode.Len;
+                    break;
+                case InflateMode.Lit:
+                    if (x.left == 0)
+                        goto inf_leave;
+                    *x.put++ = (byte)state.length;
+                    x.left--;
+                    state.mode = InflateMode.Len;
+                    break;
+                case InflateMode.Check:
+                    if (state.wrap != 0)
+                    {
+                        if (!x.NeedBits(32))
+                            goto inf_leave;
+                        @out -= x.left;
+                        strm.total_out += @out;
+                        state.total += @out;
+                        if ((state.wrap & 4) != 0 && @out != 0)
+                            strm.Adler = state.check = Adler32.Update(state.check, ref netUnsafe.AsRef<byte>(x.put - @out), @out);
+                        @out = x.left;
+                        if ((state.wrap & 4) != 0 && ZSwap32(x.hold) != state.check)
+                        {
+                            strm.msg = "incorrect data check";
+                            state.mode = InflateMode.Bad;
+                            break;
+                        }
+                        x.InitBits();
+                        Trace.Tracev("inflate:   check matches trailer\n");
+                    }
+                    state.mode = InflateMode.Done;
+                    goto case InflateMode.Done;
+                case InflateMode.Done:
+                    ret = Z_STREAM_END;
+                    goto inf_leave;
+                case InflateMode.Bad:
+                    ret = Z_DATA_ERROR;
+                    goto inf_leave;
+                case InflateMode.Mem:
                     return Z_MEM_ERROR;
-                }
+                case InflateMode.Sync:
+                default:
+                    return Z_STREAM_ERROR;
             }
-            @in -= strm.avail_in;
-            @out -= strm.avail_out;
-            strm.total_in += @in;
-            strm.total_out += @out;
-            state.total += @out;
-            if ((state.wrap & 4) != 0 && @out != 0)
-                strm.Adler = state.check = Adler32.Update(state.check, x.put - @out, @out);
-            strm.data_type = (int)state.bits + (state.last != 0 ? 64 : 0) +
-                (state.mode == InflateMode.Type ? 128 : 0) +
-                (state.mode == InflateMode.Len_ || state.mode == InflateMode.Copy_ ? 256 : 0);
-            if ((@in == 0 && @out == 0 || flush == Z_FINISH) && ret == Z_OK)
-                ret = Z_BUF_ERROR;
+
+        inf_leave:
+        x.Restore();
+        if (state.wsize != 0 || @out != strm.avail_out && state.mode < InflateMode.Bad &&
+            (state.mode < InflateMode.Check || flush != Z_FINISH))
+        {
+            try
+            {
+                UpdateWindow(strm, ref netUnsafe.AsRef<byte>(x.put), @out - strm.avail_out);
+            }
+            catch (OutOfMemoryException)
+            {
+                state.mode = InflateMode.Mem;
+                return Z_MEM_ERROR;
+            }
         }
+        @in -= strm.avail_in;
+        @out -= strm.avail_out;
+        strm.total_in += @in;
+        strm.total_out += @out;
+        state.total += @out;
+        if ((state.wrap & 4) != 0 && @out != 0)
+            strm.Adler = state.check = Adler32.Update(state.check, ref netUnsafe.AsRef<byte>(x.put - @out), @out);
+        strm.data_type = (int)state.bits + (state.last != 0 ? 64 : 0) +
+            (state.mode == InflateMode.Type ? 128 : 0) +
+            (state.mode == InflateMode.Len_ || state.mode == InflateMode.Copy_ ? 256 : 0);
+        if ((@in == 0 && @out == 0 || flush == Z_FINISH) && ret == Z_OK)
+            ret = Z_BUF_ERROR;
+
         return ret;
     }
 

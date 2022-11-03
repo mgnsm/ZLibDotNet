@@ -116,8 +116,8 @@ internal static partial class Deflater
         if (s.status == InitState)
         {
             // zlib header
-            uint header = (Z_DEFLATED + ((s.w_bits - 8) << 4)) << 8;
-            uint level_flags;
+            int header = (Z_DEFLATED + ((s.w_bits - 8) << 4)) << 8;
+            int level_flags;
 
             if (s.strategy >= Z_HUFFMAN_ONLY || s.level < 2)
                 level_flags = 0;
@@ -132,7 +132,7 @@ internal static partial class Deflater
                 header |= PresetDict;
             header += 31 - header % 31;
 
-            PutShort(s, header);
+            PutShort(s, (uint)header);
 
             // Save the adler32 of the preset dictionary:
             if (s.strstart != 0)
@@ -140,7 +140,7 @@ internal static partial class Deflater
                 PutShort(s, strm.Adler >> 16);
                 PutShort(s, strm.Adler & 0xffff);
             }
-            strm.Adler = Adler32.Update(0, null, 0);
+            strm.Adler = Adler32.Update(0, ref netUnsafe.NullRef<byte>(), 0);
             s.status = BusyState;
 
             // Compression must start with an empty pending buffer
@@ -187,7 +187,7 @@ internal static partial class Deflater
                 }
                 else if (flush != Z_BLOCK) // FULL_FLUSH or SYNC_FLUSH
                 {
-                    Tree.StoredBlock(s, null, 0, 0);
+                    Tree.StoredBlock(s, ref netUnsafe.NullRef<byte>(), 0, 0);
                     /* For a full flush, this empty block will be recognized
                      * as a special marker by InflateSync().
                      */
@@ -324,255 +324,253 @@ internal static partial class Deflater
          * this is 32K. This can be as small as 507 bytes for memLevel == 1. For
          * large input and output buffers, the stored block size will be larger.
          */
-        uint min_block = Math.Min(s.pending_buf_size - 5, s.w_size);
+        int min_block = Math.Min(s.pending_buf_size - 5, s.w_size);
 
         /* Copy as many min_block or larger stored blocks directly to next_out as
          * possible. If flushing, copy the remaining available input to next_out as
          * stored blocks, if there is enough space.
          */
-        uint len, left, have, last = 0;
-        uint used = s.strm.avail_in;
-        fixed (byte* window = s.window)
+        int len, left, have, last = 0;
+        int used = (int)s.strm.avail_in;
+        ref byte window = ref MemoryMarshal.GetReference(s.window.AsSpan());
+        do
         {
-            do
-            {
-                /* Set len to the maximum size block that we can copy directly with the
-                 * available input data and output space. Set left to how much of that
-                 * would be copied from what's left in the window.
-                 */
-                len = MaxStored; // maximum deflate stored block length
-                have = (uint)(s.bi_valid + 42) >> 3; // number of header bytes
-                if (s.strm.avail_out < have) // need room for header
-                    break;
-                // maximum stored block length that will fit in avail_out:
-                have = s.strm.avail_out - have;
-                left = (uint)(s.strstart - s.block_start); // bytes left in window
-                if (len > left + s.strm.avail_in)
-                    len = left + s.strm.avail_in; // limit len to the input
-                if (len > have)
-                    len = have; // limit len to the output
+            /* Set len to the maximum size block that we can copy directly with the
+             * available input data and output space. Set left to how much of that
+             * would be copied from what's left in the window.
+             */
+            len = MaxStored; // maximum deflate stored block length
+            have = (s.bi_valid + 42) >> 3; // number of header bytes
+            if (s.strm.avail_out < have) // need room for header
+                break;
+            // maximum stored block length that will fit in avail_out:
+            have = (int)s.strm.avail_out - have;
+            left = s.strstart - s.block_start; // bytes left in window
+            if (len > left + s.strm.avail_in)
+                len = left + (int)s.strm.avail_in; // limit len to the input
+            if (len > have)
+                len = have; // limit len to the output
 
-                /* If the stored block would be less than min_block in length, or if
-                 * unable to copy all of the available input when flushing, then try
-                 * copying to the window and the pending buffer instead. Also don't
-                 * write an empty block when flushing -- deflate() does that.
-                 */
-                if (len < min_block && (len == 0 && flush != Z_FINISH ||
-                                        flush == Z_NO_FLUSH ||
-                                        len != left + s.strm.avail_in))
-                    break;
+            /* If the stored block would be less than min_block in length, or if
+             * unable to copy all of the available input when flushing, then try
+             * copying to the window and the pending buffer instead. Also don't
+             * write an empty block when flushing -- deflate() does that.
+             */
+            if (len < min_block && (len == 0 && flush != Z_FINISH ||
+                                    flush == Z_NO_FLUSH ||
+                                    len != left + s.strm.avail_in))
+                break;
 
-                /* Make a dummy stored block in pending to get the header bytes,
-                 * including any pending bits. This also updates the debugging counts.
-                 */
-                last = flush == Z_FINISH && len == left + s.strm.avail_in ? 1U : 0U;
-                Tree.StoredBlock(s, null, 0, (int)last);
+            /* Make a dummy stored block in pending to get the header bytes,
+             * including any pending bits. This also updates the debugging counts.
+             */
+            last = flush == Z_FINISH && len == left + s.strm.avail_in ? 1 : 0;
+            Tree.StoredBlock(s, ref netUnsafe.NullRef<byte>(), 0, last);
 
-                // Replace the lengths in the dummy stored block with len.
-                s.pending_buf[s.pending - 4] = (byte)len;
-                s.pending_buf[s.pending - 3] = (byte)(len >> 8);
-                s.pending_buf[s.pending - 2] = (byte)~len;
-                s.pending_buf[s.pending - 1] = (byte)(~len >> 8);
+            // Replace the lengths in the dummy stored block with len.
+            s.pending_buf[s.pending - 4] = (byte)len;
+            s.pending_buf[s.pending - 3] = (byte)(len >> 8);
+            s.pending_buf[s.pending - 2] = (byte)~len;
+            s.pending_buf[s.pending - 1] = (byte)(~len >> 8);
 
-                // Write the stored block header bytes.
-                FlushPending(s.strm);
+            // Write the stored block header bytes.
+            FlushPending(s.strm);
 #if DEBUG
-                // Update debugging counts for the data about to be copied.
-                s.compressed_len += len << 3;
-                s.bits_sent += len << 3;
+            // Update debugging counts for the data about to be copied.
+            s.compressed_len += (uint)(len << 3);
+            s.bits_sent += (uint)(len << 3);
 #endif
-                // Copy uncompressed bytes from the window to next_out.
-                if (left != 0)
-                {
-                    if (left > len)
-                        left = len;
-                    Buffer.MemoryCopy(window + s.block_start, s.strm.next_out, left, left);
-                    s.strm.next_out += left;
-                    s.strm.avail_out -= left;
-                    s.strm.total_out += left;
-                    s.block_start += (int)left;
-                    len -= left;
-                }
+            // Copy uncompressed bytes from the window to next_out.
+            if (left != 0)
+            {
+                if (left > len)
+                    left = len;
+                netUnsafe.CopyBlockUnaligned(ref netUnsafe.AsRef<byte>(s.strm.next_out), ref netUnsafe.Add(ref window, s.block_start), (uint)left);
+                s.strm.next_out += left;
+                s.strm.avail_out -= (uint)left;
+                s.strm.total_out += (uint)left;
+                s.block_start += left;
+                len -= left;
+            }
 
-                // Copy uncompressed bytes directly from next_in to next_out, updating the check value.
-                if (len != 0)
-                {
-                    ReadBuf(s.strm, s.strm.next_out, len);
-                    s.strm.next_out += len;
-                    s.strm.avail_out -= len;
-                    s.strm.total_out += len;
-                }
-            } while (last == 0);
+            // Copy uncompressed bytes directly from next_in to next_out, updating the check value.
+            if (len != 0)
+            {
+                ReadBuf(s.strm, ref netUnsafe.AsRef<byte>(s.strm.next_out), len);
+                s.strm.next_out += len;
+                s.strm.avail_out -= (uint)len;
+                s.strm.total_out += (uint)len;
+            }
+        } while (last == 0);
 
-            /* Update the sliding window with the last s.w_size bytes of the copied
-             * data, or append all of the copied data to the existing window if less
-             * than s.w_size bytes were copied. Also update the number of bytes to
-             * insert in the hash tables, in the event that deflateParams() switches to
-             * a non-zero compression level.
+        /* Update the sliding window with the last s.w_size bytes of the copied
+         * data, or append all of the copied data to the existing window if less
+         * than s.w_size bytes were copied. Also update the number of bytes to
+         * insert in the hash tables, in the event that deflateParams() switches to
+         * a non-zero compression level.
+         */
+        used -= (int)s.strm.avail_in; // number of input bytes directly copied
+        if (used != 0)
+        {
+            /* If any input was used, then no unused input remains in the window,
+             * therefore s.block_start == s.strstart.
              */
-            used -= s.strm.avail_in; // number of input bytes directly copied
-            if (used != 0)
+            if (used >= s.w_size) // supplant the previous history
             {
-                /* If any input was used, then no unused input remains in the window,
-                 * therefore s.block_start == s.strstart.
-                 */
-                if (used >= s.w_size) // supplant the previous history
+                s.matches = 2; // clear hash
+                netUnsafe.CopyBlockUnaligned(ref window, ref netUnsafe.AsRef<byte>(s.strm.next_in - s.w_size), (uint)s.w_size);
+
+                s.strstart = s.w_size;
+                s.insert = s.strstart;
+            }
+            else
+            {
+                if (s.window_size - s.strstart <= used)
                 {
-                    s.matches = 2; // clear hash
-                    Buffer.MemoryCopy(s.strm.next_in - s.w_size, window, s.w_size, s.w_size);
-                    s.strstart = s.w_size;
-                    s.insert = s.strstart;
+                    // Slide the window down
+                    s.strstart -= s.w_size;
+                    netUnsafe.CopyBlockUnaligned(ref window, ref netUnsafe.Add(ref window, s.w_size), (uint)s.strstart);
+                    if (s.matches < 2)
+                        s.matches++; // add a pending SlideHash()
+                    if (s.insert > s.strstart)
+                        s.insert = s.strstart;
                 }
-                else
-                {
-                    if (s.window_size - s.strstart <= used)
-                    {
-                        // Slide the window down
-                        s.strstart -= s.w_size;
-                        Buffer.MemoryCopy(window + s.w_size, window, s.strstart, s.strstart);
-                        if (s.matches < 2)
-                            s.matches++; // add a pending SlideHash()
-                        if (s.insert > s.strstart)
-                            s.insert = s.strstart;
-                    }
-                    Buffer.MemoryCopy(s.strm.next_in - used, window + s.strstart, used, used);
-                    s.strstart += used;
-                    s.insert += Math.Min(used, s.w_size - s.insert);
-                }
-                s.block_start = (int)s.strstart;
+                netUnsafe.CopyBlockUnaligned(ref netUnsafe.Add(ref window, s.strstart), ref netUnsafe.AsRef<byte>(s.strm.next_in - used), (uint)used);
+                s.strstart += used;
+                s.insert += Math.Min(used, s.w_size - s.insert);
             }
+            s.block_start = s.strstart;
+        }
 
-            if (s.high_water < s.strstart)
-                s.high_water = s.strstart;
+        if (s.high_water < s.strstart)
+            s.high_water = s.strstart;
 
-            // If the last block was written to next_out, then done.
-            if (last != 0)
-                return BlockState.FinishDone;
+        // If the last block was written to next_out, then done.
+        if (last != 0)
+            return BlockState.FinishDone;
 
-            // If flushing and all input has been consumed, then done.
-            if (flush != Z_NO_FLUSH && flush != Z_FINISH &&
-                s.strm.avail_in == 0 && s.strstart == s.block_start)
-                return BlockState.BlockDone;
+        // If flushing and all input has been consumed, then done.
+        if (flush != Z_NO_FLUSH && flush != Z_FINISH &&
+            s.strm.avail_in == 0 && s.strstart == s.block_start)
+            return BlockState.BlockDone;
 
-            // Fill the window with any remaining input.
-            have = s.window_size - s.strstart;
-            if (s.strm.avail_in > have && s.block_start >= s.w_size)
-            {
-                /* Slide the window down. */
-                s.block_start -= (int)s.w_size;
-                s.strstart -= s.w_size;
-                Buffer.MemoryCopy(window + s.w_size, window, s.strstart, s.strstart);
-                if (s.matches < 2)
-                    s.matches++;    // add a pending SlideHash()
-                have += s.w_size;   // more space now
-                if (s.insert > s.strstart)
-                    s.insert = s.strstart;
-            }
-            if (have > s.strm.avail_in)
-                have = s.strm.avail_in;
-            if (have != 0)
-            {
-                ReadBuf(s.strm, window + s.strstart, have);
-                s.strstart += have;
-                s.insert += Math.Min(have, s.w_size - s.insert);
-            }
-            if (s.high_water < s.strstart)
-                s.high_water = s.strstart;
+        // Fill the window with any remaining input.
+        have = s.window_size - s.strstart;
+        if (s.strm.avail_in > have && s.block_start >= s.w_size)
+        {
+            /* Slide the window down. */
+            s.block_start -= s.w_size;
+            s.strstart -= s.w_size;
+            netUnsafe.CopyBlockUnaligned(ref window, ref netUnsafe.Add(ref window, s.w_size), (uint)s.strstart);
+            if (s.matches < 2)
+                s.matches++;    // add a pending SlideHash()
+            have += s.w_size;   // more space now
+            if (s.insert > s.strstart)
+                s.insert = s.strstart;
+        }
+        if (have > s.strm.avail_in)
+            have = (int)s.strm.avail_in;
+        if (have != 0)
+        {
+            ReadBuf(s.strm, ref netUnsafe.Add(ref window, s.strstart), have);
+            s.strstart += have;
+            s.insert += Math.Min(have, s.w_size - s.insert);
+        }
+        if (s.high_water < s.strstart)
+            s.high_water = s.strstart;
 
-            /* There was not enough avail_out to write a complete worthy or flushed
-             * stored block to next_out. Write a stored block to pending instead, if we
-             * have enough input for a worthy block, or if flushing and there is enough
-             * room for the remaining input as a stored block in the pending buffer.
-             */
-            have = (uint)((s.bi_valid + 42) >> 3); // number of header bytes
-            // maximum stored block length that will fit in pending:
-            have = Math.Min(s.pending_buf_size - have, MaxStored);
-            min_block = Math.Min(have, s.w_size);
-            left = (uint)(s.strstart - s.block_start);
-            if (left >= min_block ||
-                (left != 0 || flush == Z_FINISH) && flush != Z_NO_FLUSH &&
-                 s.strm.avail_in == 0 && left <= have)
-            {
-                len = Math.Min(left, have);
-                last = flush == Z_FINISH && s.strm.avail_in == 0 && len == left ? 1U : 0U;
-                Tree.StoredBlock(s, window + s.block_start, len, (int)last);
-                s.block_start += (int)len;
-                FlushPending(s.strm);
-            }
+        /* There was not enough avail_out to write a complete worthy or flushed
+         * stored block to next_out. Write a stored block to pending instead, if we
+         * have enough input for a worthy block, or if flushing and there is enough
+         * room for the remaining input as a stored block in the pending buffer.
+         */
+        have = (s.bi_valid + 42) >> 3; // number of header bytes
+        // maximum stored block length that will fit in pending:
+        have = Math.Min(s.pending_buf_size - have, MaxStored);
+        min_block = Math.Min(have, s.w_size);
+        left = s.strstart - s.block_start;
+        if (left >= min_block ||
+            (left != 0 || flush == Z_FINISH) && flush != Z_NO_FLUSH &&
+             s.strm.avail_in == 0 && left <= have)
+        {
+            len = Math.Min(left, have);
+            last = flush == Z_FINISH && s.strm.avail_in == 0 && len == left ? 1 : 0;
+            Tree.StoredBlock(s, ref netUnsafe.Add(ref window, s.block_start), (uint)len, last);
+            s.block_start += len;
+            FlushPending(s.strm);
         }
 
         // We've done all we can with the available input and output.
         return last != 0 ? BlockState.FinishStarted : BlockState.NeedMore;
     }
 
-    private static unsafe uint ReadBuf(Unsafe.ZStream strm, byte* buf, uint size)
+    private static unsafe int ReadBuf(Unsafe.ZStream strm, ref byte buf, int size)
     {
         uint len = strm.avail_in;
 
         if (len > size)
-            len = size;
+            len = (uint)size;
         if (len == 0)
             return 0;
 
         strm.avail_in -= len;
 
-        Buffer.MemoryCopy(strm.next_in, buf, len, len);
+        netUnsafe.CopyBlockUnaligned(ref buf, ref netUnsafe.AsRef<byte>(strm.next_in), len);
         if (strm.deflateState.wrap == 1)
-            strm.Adler = Adler32.Update(strm.Adler, buf, len);
+            strm.Adler = Adler32.Update(strm.Adler, ref buf, len);
 
         strm.next_in += len;
         strm.total_in += len;
 
-        return len;
+        return (int)len;
     }
 
-    private static unsafe BlockState DeflateHuff(DeflateState s, int flush)
+    private static BlockState DeflateHuff(DeflateState s, int flush)
     {
         BlockState state;
-        fixed (byte* window = s.window)
+        ref byte window = ref MemoryMarshal.GetReference(s.window.AsSpan());
+        for (; ; )
         {
-            for (; ; )
+            // Make sure that we have a literal to write.
+            if (s.lookahead == 0)
             {
-                // Make sure that we have a literal to write.
+                FillWindow(s, ref window);
                 if (s.lookahead == 0)
                 {
-                    FillWindow(s, window);
-                    if (s.lookahead == 0)
-                    {
-                        if (flush == Z_NO_FLUSH)
-                            return BlockState.NeedMore;
-                        break; // flush the current block
-                    }
+                    if (flush == Z_NO_FLUSH)
+                        return BlockState.NeedMore;
+                    break; // flush the current block
                 }
-
-                // Output a literal byte
-                s.match_length = 0;
-                Trace.Tracevv($"{Convert.ToChar(s.window[s.strstart])}");
-                TreeTallyLit(s, window[s.strstart], out bool bflush);
-                s.lookahead--;
-                s.strstart++;
-                if (bflush && FlushBlock(s, 0, window, out state))
-                    return state;
             }
 
-            s.insert = 0;
-            if (flush == Z_FINISH)
-            {
-                if (FlushBlock(s, 1, window, out state))
-                    return state;
-                return BlockState.FinishDone;
-            }
-            if (s.sym_next != 0 && FlushBlock(s, 0, window, out state))
+            // Output a literal byte
+            s.match_length = 0;
+            Trace.Tracevv($"{Convert.ToChar(s.window[s.strstart])}");
+            TreeTallyLit(s, netUnsafe.Add(ref window, s.strstart), out bool bflush);
+            s.lookahead--;
+            s.strstart++;
+            if (bflush && FlushBlock(s, 0, ref window, out state))
                 return state;
         }
+
+        s.insert = 0;
+        if (flush == Z_FINISH)
+        {
+            if (FlushBlock(s, 1, ref window, out state))
+                return state;
+            return BlockState.FinishDone;
+        }
+        if (s.sym_next != 0 && FlushBlock(s, 0, ref window, out state))
+            return state;
+
         return BlockState.BlockDone;
     }
 
-    private static unsafe void FillWindow(DeflateState s, byte* window)
+    private static void FillWindow(DeflateState s, ref byte window)
     {
-        uint n;
-        uint more; // Amount of free space at the end of the window.
-        uint wsize = s.w_size;
+        int n;
+        int more; // Amount of free space at the end of the window.
+        int wsize = s.w_size;
 
         Debug.Assert(s.lookahead < MinLookAhead, "already enough lookahead");
 
@@ -585,11 +583,11 @@ internal static partial class Deflater
              */
             if (s.strstart >= wsize + s.w_size - MinLookAhead)
             {
-                uint sourceBytesToCopy = wsize - more;
-                Buffer.MemoryCopy(window + wsize, window, sourceBytesToCopy, sourceBytesToCopy);
+                int sourceBytesToCopy = wsize - more;
+                netUnsafe.CopyBlockUnaligned(ref window, ref netUnsafe.Add(ref window, wsize), (uint)sourceBytesToCopy);
                 s.match_start -= wsize;
                 s.strstart -= wsize; // we now have strstart >= MaxDist
-                s.block_start -= (int)wsize;
+                s.block_start -= wsize;
                 if (s.insert > s.strstart)
                     s.insert = s.strstart;
                 SlideHash(s);
@@ -611,19 +609,19 @@ internal static partial class Deflater
              */
             Debug.Assert(more >= 2, "more < 2");
 
-            n = ReadBuf(s.strm, window + s.strstart + s.lookahead, more);
+            n = ReadBuf(s.strm, ref netUnsafe.Add(ref window, s.strstart + s.lookahead), more);
             s.lookahead += n;
 
             // Initialize the hash value now that we have some input:
             if (s.lookahead + s.insert >= MinMatch)
             {
-                uint str = s.strstart - s.insert;
-                s.ins_h = window[str];
-                UpdateHash(s, ref s.ins_h, window[str + 1]);
+                int str = s.strstart - s.insert;
+                s.ins_h = netUnsafe.Add(ref window, str);
+                UpdateHash(s, ref s.ins_h, netUnsafe.Add(ref window, str + 1));
 
                 while (s.insert != 0)
                 {
-                    UpdateHash(s, ref s.ins_h, window[str + MinMatch - 1]);
+                    UpdateHash(s, ref s.ins_h, netUnsafe.Add(ref window, str + MinMatch - 1));
                     s.prev[str & s.w_mask] = s.head[s.ins_h];
                     s.head[s.ins_h] = (ushort)str;
                     str++;
@@ -646,8 +644,8 @@ internal static partial class Deflater
          */
         if (s.high_water < s.window_size)
         {
-            uint curr = s.strstart + s.lookahead;
-            uint init;
+            int curr = s.strstart + s.lookahead;
+            int init;
 
             if (s.high_water < curr)
             {
@@ -657,7 +655,7 @@ internal static partial class Deflater
                 init = s.window_size - curr;
                 if (init > WinInit)
                     init = WinInit;
-                MemorySet(window + curr, 0, (int)init);
+                netUnsafe.InitBlockUnaligned(ref netUnsafe.Add(ref window, curr), 0, (uint)init);
                 s.high_water = curr + init;
             }
             else if (s.high_water < curr + WinInit)
@@ -669,69 +667,61 @@ internal static partial class Deflater
                 init = curr + WinInit - s.high_water;
                 if (init > s.window_size - s.high_water)
                     init = s.window_size - s.high_water;
-                MemorySet(window + s.high_water, 0, (int)init);
+                netUnsafe.InitBlockUnaligned(ref netUnsafe.Add(ref window, s.high_water), 0, (uint)init);
                 s.high_water += init;
             }
         }
     }
 
-    private static unsafe void SlideHash(DeflateState s)
+    private static void SlideHash(DeflateState s)
     {
-        uint wsize = s.w_size;
-        uint n = s.hash_size;
+        int wsize = s.w_size;
+        int n = s.hash_size;
         uint m;
 
-        fixed (ushort* head = s.head)
-        fixed (ushort* prev = s.prev)
+        ref ushort head = ref MemoryMarshal.GetReference(s.head.AsSpan());
+        ref ushort prev = ref MemoryMarshal.GetReference(s.prev.AsSpan());
+        ref ushort p = ref netUnsafe.Add(ref head, n);
+        do
         {
-            ushort* p = head + n;
-            do
-            {
-                m = *--p;
-                *p = (ushort)(m >= wsize ? m - wsize : 0);
-            } while (--n > 0);
-            n = wsize;
-            p = prev + n;
-            do
-            {
-                m = *--p;
-                *p = (ushort)(m >= wsize ? m - wsize : 0);
-                /* If n is not on any hash chain, prev[n] is garbage but
-                 * its value will never be used.
-                 */
-            } while (--n > 0);
-        }
+            p = ref netUnsafe.Subtract(ref p, 1);
+            m = p;
+            p = (ushort)(m >= wsize ? m - wsize : 0);
+        } while (--n > 0);
+        n = wsize;
+        p = ref netUnsafe.Add(ref prev, n);
+        do
+        {
+            p = ref netUnsafe.Subtract(ref p, 1);
+            m = p;
+            p = (ushort)(m >= wsize ? m - wsize : 0);
+            /* If n is not on any hash chain, prev[n] is garbage but
+             * its value will never be used.
+             */
+        } while (--n > 0);
     }
 
     /// <summary>
     /// Updates a hash value with the given input byte
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void UpdateHash(DeflateState s, ref uint h, byte c) =>
-        h = (((h) << (int)s.hash_shift) ^ c) & s.hash_mask;
-
-    private static unsafe void MemorySet(byte* ptr, int value, int num)
-    {
-        byte* source = stackalloc byte[num];
-        Buffer.MemoryCopy(source, ptr, num, num);
-    }
+    private static void UpdateHash(DeflateState s, ref int h, byte c) =>
+        h = (((h) << s.hash_shift) ^ c) & s.hash_mask;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe void FlushBlockOnly(DeflateState s, int last, byte* window)
+    private static void FlushBlockOnly(DeflateState s, int last, ref byte window)
     {
-        Tree.FlushBlock(s,
-            s.block_start >= 0L ? (window + s.block_start) : null,
-            (uint)(s.strstart - s.block_start),
-            last);
-        s.block_start = (int)s.strstart;
+        ref byte buf = ref s.block_start >= 0L ? ref netUnsafe.Add(ref window, s.block_start) : ref netUnsafe.NullRef<byte>();
+        Tree.FlushBlock(s, ref buf, (uint)(s.strstart - s.block_start), last);
+        s.block_start = s.strstart;
         FlushPending(s.strm);
         Trace.Tracev("[FLUSH]");
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe bool FlushBlock(DeflateState s, int last, byte* window, out BlockState state)
+    private static bool FlushBlock(DeflateState s, int last, ref byte window, out BlockState state)
     {
-        FlushBlockOnly(s, last, window);
+        FlushBlockOnly(s, last, ref window);
         if (s.strm.avail_out == 0)
         {
             state = (last != 0) ? BlockState.FinishStarted : BlockState.NeedMore;
@@ -763,82 +753,81 @@ internal static partial class Deflater
         byte* scan, strend; // scan goes up to strend for length of run
         BlockState state;
 
-        fixed (byte* window = s.window)
+        ref byte window = ref MemoryMarshal.GetReference(s.window.AsSpan());
+        for (; ; )
         {
-            for (; ; )
+            /* Make sure that we always have enough lookahead, except
+             * at the end of the input file. We need MaxMatch bytes
+             * for the longest run, plus one for the unrolled loop.
+             */
+            if (s.lookahead <= MaxMatch)
             {
-                /* Make sure that we always have enough lookahead, except
-                 * at the end of the input file. We need MaxMatch bytes
-                 * for the longest run, plus one for the unrolled loop.
-                 */
-                if (s.lookahead <= MaxMatch)
-                {
-                    FillWindow(s, window);
-                    if (s.lookahead <= MaxMatch && flush == Z_NO_FLUSH)
-                        return BlockState.NeedMore;
-                    if (s.lookahead == 0)
-                        break; // flush the current block
-                }
+                FillWindow(s, ref window);
+                if (s.lookahead <= MaxMatch && flush == Z_NO_FLUSH)
+                    return BlockState.NeedMore;
+                if (s.lookahead == 0)
+                    break; // flush the current block
+            }
 
-                // See how many times the previous byte repeats
-                s.match_length = 0;
-                if (s.lookahead >= MinMatch && s.strstart > 0)
+            // See how many times the previous byte repeats
+            s.match_length = 0;
+            if (s.lookahead >= MinMatch && s.strstart > 0)
+            {
+                scan = (byte*)netUnsafe.AsPointer(ref window) + s.strstart - 1;
+                prev = *scan;
+                if (prev == *++scan && prev == *++scan && prev == *++scan)
                 {
-                    scan = window + s.strstart - 1;
-                    prev = *scan;
-                    if (prev == *++scan && prev == *++scan && prev == *++scan)
+                    strend = (byte*)netUnsafe.AsPointer(ref window) + s.strstart + MaxMatch;
+                    do
                     {
-                        strend = window + s.strstart + MaxMatch;
-                        do
-                        {
-                        } while (prev == *++scan && prev == *++scan &&
-                                 prev == *++scan && prev == *++scan &&
-                                 prev == *++scan && prev == *++scan &&
-                                 prev == *++scan && prev == *++scan &&
-                                 scan < strend);
-                        s.match_length = MaxMatch - (uint)(strend - scan);
-                        if (s.match_length > s.lookahead)
-                            s.match_length = s.lookahead;
-                    }
-                    Debug.Assert(scan <= window + (s.window_size - 1), "wild scan");
+                    } while (prev == *++scan && prev == *++scan &&
+                             prev == *++scan && prev == *++scan &&
+                             prev == *++scan && prev == *++scan &&
+                             prev == *++scan && prev == *++scan &&
+                             scan < strend);
+                    s.match_length = MaxMatch - (int)(strend - scan);
+                    if (s.match_length > s.lookahead)
+                        s.match_length = s.lookahead;
                 }
-
-                // Emit match if have run of MinMatch or longer, else emit literal
-                if (s.match_length >= MinMatch)
-                {
-                    TreeTallyDist(s, 1, s.match_length - MinMatch, out bflush);
-
-                    s.lookahead -= s.match_length;
-                    s.strstart += s.match_length;
-                    s.match_length = 0;
-                }
-                else
-                {
-                    // No match, output a literal byte
-                    Trace.Tracevv($"{Convert.ToChar(s.window[s.strstart])}");
-                    TreeTallyLit(s, s.window[s.strstart], out bflush);
-                    s.lookahead--;
-                    s.strstart++;
-                }
-                if (bflush && FlushBlock(s, 0, window, out state))
-                    return state;
+                Debug.Assert(scan <= (byte*)netUnsafe.AsPointer(ref window) + (s.window_size - 1), "wild scan");
             }
 
-            s.insert = 0;
-            if (flush == Z_FINISH)
+            // Emit match if have run of MinMatch or longer, else emit literal
+            if (s.match_length >= MinMatch)
             {
-                if (FlushBlock(s, 1, window, out state))
-                    return state;
-                return BlockState.FinishDone;
+                TreeTallyDist(s, 1, s.match_length - MinMatch, out bflush);
+
+                s.lookahead -= s.match_length;
+                s.strstart += s.match_length;
+                s.match_length = 0;
             }
-            if (s.sym_next != 0 && FlushBlock(s, 0, window, out state))
+            else
+            {
+                // No match, output a literal byte
+                Trace.Tracevv($"{Convert.ToChar(s.window[s.strstart])}");
+                TreeTallyLit(s, s.window[s.strstart], out bflush);
+                s.lookahead--;
+                s.strstart++;
+            }
+            if (bflush && FlushBlock(s, 0, ref window, out state))
                 return state;
         }
+
+        s.insert = 0;
+        if (flush == Z_FINISH)
+        {
+            if (FlushBlock(s, 1, ref window, out state))
+                return state;
+            return BlockState.FinishDone;
+        }
+        if (s.sym_next != 0 && FlushBlock(s, 0, ref window, out state))
+            return state;
+
         return BlockState.BlockDone;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe void TreeTallyDist(DeflateState s, int distance, uint length, out bool flush)
+    private static unsafe void TreeTallyDist(DeflateState s, int distance, int length, out bool flush)
 #if DEBUG
     {
         byte len = (byte)length;
@@ -866,113 +855,108 @@ internal static partial class Deflater
         };
     }
 
-    private static BlockState DeflateFast(DeflateState s, int flush)
+    private static unsafe BlockState DeflateFast(DeflateState s, int flush)
     {
-        uint hash_head; // head of the hash chain
+        int hash_head; // head of the hash chain
         bool bflush;    // set if current block must be flushed
         BlockState state;
 
-        unsafe
+        ref byte window = ref MemoryMarshal.GetReference(s.window.AsSpan());
+        for (; ; )
         {
-            fixed (byte* window = s.window)
+            /* Make sure that we always have enough lookahead, except
+             * at the end of the input file. We need MaxMatch bytes
+             * for the next match, plus MinMatch bytes to insert the
+             * string following the next match.
+             */
+            if (s.lookahead < MinLookAhead)
             {
-                for (; ; )
-                {
-                    /* Make sure that we always have enough lookahead, except
-                     * at the end of the input file. We need MaxMatch bytes
-                     * for the next match, plus MinMatch bytes to insert the
-                     * string following the next match.
-                     */
-                    if (s.lookahead < MinLookAhead)
-                    {
-                        FillWindow(s, window);
-                        if (s.lookahead < MinLookAhead && flush == Z_NO_FLUSH)
-                            return BlockState.NeedMore;
-                        if (s.lookahead == 0)
-                            break; // flush the current block
-                    }
-
-                    /* Insert the string window[strstart .. strstart+2] in the
-                     * dictionary, and set hash_head to the head of the hash chain:
-                     */
-                    hash_head = 0;
-                    if (s.lookahead >= MinMatch)
-                        InsertString(s, s.strstart, ref hash_head);
-
-                    /* Find the longest match, discarding those <= prev_length.
-                     * At this point we have always match_length < MinMatch
-                     */
-                    if (hash_head != 0 && s.strstart - hash_head <= MaxDist(s))
-                    {
-                        /* To simplify the code, we prevent matches with the string
-                         * of window index 0 (in particular we have to avoid a match
-                         * of the string with itself at the start of the input file).
-                         */
-                        s.match_length = LongestMatch(s, hash_head, window);
-                        // LongestMatch() sets match_start
-                    }
-                    if (s.match_length >= MinMatch)
-                    {
-                        TreeTallyDist(s, (int)(s.strstart - s.match_start), s.match_length - MinMatch, out bflush);
-
-                        s.lookahead -= s.match_length;
-
-                        /* Insert new strings in the hash table only if the match length
-                         * is not too large. This saves time but degrades compression.
-                         */
-                        if (s.match_length <= s.max_lazy_match &&
-                            s.lookahead >= MinMatch)
-                        {
-                            s.match_length--; // string at strstart already in table
-                            do
-                            {
-                                s.strstart++;
-                                InsertString(s, s.strstart, ref hash_head);
-                                /* strstart never exceeds WSize-MaxMatch, so there are
-                                 * always MinMatch bytes ahead.
-                                 */
-                            } while (--s.match_length != 0);
-                            s.strstart++;
-                        }
-                        else
-                        {
-                            s.strstart += s.match_length;
-                            s.match_length = 0;
-                            s.ins_h = s.window[s.strstart];
-                            UpdateHash(s, ref s.ins_h, s.window[s.strstart + 1]);
-
-                            /* If lookahead < MinMatch, ins_h is garbage, but it does not
-                             * matter since it will be recomputed at next deflate call.
-                             */
-                        }
-                    }
-                    else
-                    {
-                        // No match, output a literal byte
-                        Trace.Tracevv($"{Convert.ToChar(s.window[s.strstart])}");
-                        TreeTallyLit(s, s.window[s.strstart], out bflush);
-                        s.lookahead--;
-                        s.strstart++;
-                    }
-                    if (bflush && FlushBlock(s, 0, window, out state))
-                        return state;
-                }
-                s.insert = s.strstart < MinMatch - 1 ? s.strstart : MinMatch - 1;
-                if (flush == Z_FINISH)
-                {
-                    if (FlushBlock(s, 1, window, out state))
-                        return state;
-                    return BlockState.FinishDone;
-                }
-                if (s.sym_next != 0 && FlushBlock(s, 0, window, out state))
-                    return state;
-                return BlockState.BlockDone;
+                FillWindow(s, ref window);
+                if (s.lookahead < MinLookAhead && flush == Z_NO_FLUSH)
+                    return BlockState.NeedMore;
+                if (s.lookahead == 0)
+                    break; // flush the current block
             }
+
+            /* Insert the string window[strstart .. strstart+2] in the
+             * dictionary, and set hash_head to the head of the hash chain:
+             */
+            hash_head = 0;
+            if (s.lookahead >= MinMatch)
+                InsertString(s, s.strstart, ref hash_head);
+
+            /* Find the longest match, discarding those <= prev_length.
+             * At this point we have always match_length < MinMatch
+             */
+            if (hash_head != 0 && s.strstart - hash_head <= MaxDist(s))
+            {
+                /* To simplify the code, we prevent matches with the string
+                 * of window index 0 (in particular we have to avoid a match
+                 * of the string with itself at the start of the input file).
+                 */
+                s.match_length = LongestMatch(s, hash_head, (byte*)netUnsafe.AsPointer(ref window));
+                // LongestMatch() sets match_start
+            }
+            if (s.match_length >= MinMatch)
+            {
+                TreeTallyDist(s, s.strstart - s.match_start, s.match_length - MinMatch, out bflush);
+
+                s.lookahead -= s.match_length;
+
+                /* Insert new strings in the hash table only if the match length
+                 * is not too large. This saves time but degrades compression.
+                 */
+                if (s.match_length <= s.max_lazy_match &&
+                    s.lookahead >= MinMatch)
+                {
+                    s.match_length--; // string at strstart already in table
+                    do
+                    {
+                        s.strstart++;
+                        InsertString(s, s.strstart, ref hash_head);
+                        /* strstart never exceeds WSize-MaxMatch, so there are
+                         * always MinMatch bytes ahead.
+                         */
+                    } while (--s.match_length != 0);
+                    s.strstart++;
+                }
+                else
+                {
+                    s.strstart += s.match_length;
+                    s.match_length = 0;
+                    s.ins_h = s.window[s.strstart];
+                    UpdateHash(s, ref s.ins_h, s.window[s.strstart + 1]);
+
+                    /* If lookahead < MinMatch, ins_h is garbage, but it does not
+                     * matter since it will be recomputed at next deflate call.
+                     */
+                }
+            }
+            else
+            {
+                // No match, output a literal byte
+                Trace.Tracevv($"{Convert.ToChar(s.window[s.strstart])}");
+                TreeTallyLit(s, s.window[s.strstart], out bflush);
+                s.lookahead--;
+                s.strstart++;
+            }
+            if (bflush && FlushBlock(s, 0, ref window, out state))
+                return state;
         }
+        s.insert = s.strstart < MinMatch - 1 ? s.strstart : MinMatch - 1;
+        if (flush == Z_FINISH)
+        {
+            if (FlushBlock(s, 1, ref window, out state))
+                return state;
+            return BlockState.FinishDone;
+        }
+        if (s.sym_next != 0 && FlushBlock(s, 0, ref window, out state))
+            return state;
+        return BlockState.BlockDone;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void InsertString(DeflateState s, uint str, ref uint match_head)
+    private static void InsertString(DeflateState s, int str, ref int match_head)
     {
         UpdateHash(s, ref s.ins_h, s.window[str + (MinMatch - 1)]);
         match_head = s.prev[(str) & s.w_mask] = s.head[s.ins_h];
@@ -980,21 +964,21 @@ internal static partial class Deflater
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static uint MaxDist(DeflateState s) => s.w_size - MinLookAhead;
+    internal static int MaxDist(DeflateState s) => s.w_size - MinLookAhead;
 
-    private static unsafe uint LongestMatch(DeflateState s, uint cur_match, byte* window)
+    private static unsafe int LongestMatch(DeflateState s, int cur_match, byte* window)
     {
         uint chain_length = s.max_chain_length; // max hash chain length
         byte* scan = window + s.strstart;       // current string
         byte* match;                            // matched string
         int len;                                // length of current match
-        int best_len = (int)s.prev_length;      // best match length so far
+        int best_len = s.prev_length;      // best match length so far
         int nice_match = s.nice_match;          // stop if match long enough
-        uint limit = s.strstart > MaxDist(s) ? s.strstart - MaxDist(s) : 0;
+        int limit = s.strstart > MaxDist(s) ? s.strstart - MaxDist(s) : 0;
         /* Stop when cur_match becomes <= limit. To simplify the code,
          * we prevent matches with the string of window index 0.
          */
-        uint wmask = s.w_mask;
+        int wmask = s.w_mask;
         byte* strend = window + s.strstart + MaxMatch;
         byte scan_end1 = scan[best_len - 1];
         byte scan_end = scan[best_len];
@@ -1012,211 +996,206 @@ internal static partial class Deflater
          * to make deflate deterministic.
          */
         if ((uint)nice_match > s.lookahead)
-            nice_match = (int)s.lookahead;
+            nice_match = s.lookahead;
 
         Debug.Assert(s.strstart <= s.window_size - MinLookAhead, "need lookahead");
 
-        fixed (ushort* prev = s.prev)
+        ref ushort prev = ref MemoryMarshal.GetReference(s.prev.AsSpan());
+        do
         {
+            Debug.Assert(cur_match < s.strstart, "no future");
+            match = window + cur_match;
+
+            /* Skip to next match if the match length cannot increase
+             * or if the match length is less than 2.  Note that the checks below
+             * for insufficient lookahead only occur occasionally for performance
+             * reasons.  Therefore uninitialized memory will be accessed, and
+             * conditional jumps will be made that depend on those values.
+             * However the length of the match is limited to the lookahead, so
+             * the output of deflate is not affected by the uninitialized values.
+             */
+
+            if (match[best_len] != scan_end
+                || match[best_len - 1] != scan_end1
+                || *match != *scan
+                || *++match != scan[1])
+                continue;
+
+            /* The check at best_len-1 can be removed because it will be made
+             * again later. (This heuristic is not always a win.)
+             * It is not necessary to compare scan[2] and match[2] since they
+             * are always equal when the other bytes match, given that
+             * the hash keys are equal and that HASH_BITS >= 8.
+             */
+            scan += 2;
+            match++;
+
+            Debug.Assert(*scan == *match, "match[2]?");
+
+            /* We check for insufficient lookahead only every 8th comparison;
+             * the 256th check will be made at strstart+258.
+             */
             do
             {
-                Debug.Assert(cur_match < s.strstart, "no future");
-                match = window + cur_match;
+            } while (*++scan == *++match && *++scan == *++match &&
+                     *++scan == *++match && *++scan == *++match &&
+                     *++scan == *++match && *++scan == *++match &&
+                     *++scan == *++match && *++scan == *++match &&
+                     scan < strend);
 
-                /* Skip to next match if the match length cannot increase
-                 * or if the match length is less than 2.  Note that the checks below
-                 * for insufficient lookahead only occur occasionally for performance
-                 * reasons.  Therefore uninitialized memory will be accessed, and
-                 * conditional jumps will be made that depend on those values.
-                 * However the length of the match is limited to the lookahead, so
-                 * the output of deflate is not affected by the uninitialized values.
-                 */
+            Debug.Assert(scan <= window + (s.window_size - 1), "wild scan");
 
-                if (match[best_len] != scan_end
-                    || match[best_len - 1] != scan_end1
-                    || *match != *scan
-                    || *++match != scan[1])
-                    continue;
+            len = MaxMatch - (int)(strend - scan);
+            scan = strend - MaxMatch;
 
-                /* The check at best_len-1 can be removed because it will be made
-                 * again later. (This heuristic is not always a win.)
-                 * It is not necessary to compare scan[2] and match[2] since they
-                 * are always equal when the other bytes match, given that
-                 * the hash keys are equal and that HASH_BITS >= 8.
-                 */
-                scan += 2;
-                match++;
-
-                Debug.Assert(*scan == *match, "match[2]?");
-
-                /* We check for insufficient lookahead only every 8th comparison;
-                 * the 256th check will be made at strstart+258.
-                 */
-                do
-                {
-                } while (*++scan == *++match && *++scan == *++match &&
-                         *++scan == *++match && *++scan == *++match &&
-                         *++scan == *++match && *++scan == *++match &&
-                         *++scan == *++match && *++scan == *++match &&
-                         scan < strend);
-
-                Debug.Assert(scan <= window + (s.window_size - 1), "wild scan");
-
-                len = MaxMatch - (int)(strend - scan);
-                scan = strend - MaxMatch;
-
-                if (len > best_len)
-                {
-                    s.match_start = cur_match;
-                    best_len = len;
-                    if (len >= nice_match)
-                        break;
-                    scan_end1 = scan[best_len - 1];
-                    scan_end = scan[best_len];
-                }
-            } while ((cur_match = prev[cur_match & wmask]) > limit && --chain_length != 0);
-        }
+            if (len > best_len)
+            {
+                s.match_start = cur_match;
+                best_len = len;
+                if (len >= nice_match)
+                    break;
+                scan_end1 = scan[best_len - 1];
+                scan_end = scan[best_len];
+            }
+        } while ((cur_match = netUnsafe.Add(ref prev, cur_match & wmask)) > limit && --chain_length != 0);
 
         if ((uint)best_len <= s.lookahead)
-            return (uint)best_len;
+            return best_len;
 
         return s.lookahead;
     }
 
-    private static BlockState DeflateSlow(DeflateState s, int flush)
+    private static unsafe BlockState DeflateSlow(DeflateState s, int flush)
     {
-        uint hash_head; // head of hash chain
+        int hash_head; // head of hash chain
         bool bflush;    // set if current block must be flushed
         BlockState state;
 
-        unsafe
+        ref byte window = ref MemoryMarshal.GetReference(s.window.AsSpan());
+        // Process the input block.
+        for (; ; )
         {
-            fixed (byte* window = s.window)
+            /* Make sure that we always have enough lookahead, except
+             * at the end of the input file. We need MaxMatch bytes
+             * for the next match, plus MinMatch bytes to insert the
+             * string following the next match.
+             */
+            if (s.lookahead < MinLookAhead)
             {
-                // Process the input block.
-                for (; ; )
+                FillWindow(s, ref window);
+                if (s.lookahead < MinLookAhead && flush == Z_NO_FLUSH)
                 {
-                    /* Make sure that we always have enough lookahead, except
-                     * at the end of the input file. We need MaxMatch bytes
-                     * for the next match, plus MinMatch bytes to insert the
-                     * string following the next match.
-                     */
-                    if (s.lookahead < MinLookAhead)
-                    {
-                        FillWindow(s, window);
-                        if (s.lookahead < MinLookAhead && flush == Z_NO_FLUSH)
-                        {
-                            return BlockState.NeedMore;
-                        }
-                        if (s.lookahead == 0)
-                            break; // flush the current block
-                    }
+                    return BlockState.NeedMore;
+                }
+                if (s.lookahead == 0)
+                    break; // flush the current block
+            }
 
-                    /* Insert the string window[strstart .. strstart+2] in the
-                     * dictionary, and set hash_head to the head of the hash chain:
-                     */
-                    hash_head = 0;
-                    if (s.lookahead >= MinMatch)
-                    {
-                        InsertString(s, s.strstart, ref hash_head);
-                    }
+            /* Insert the string window[strstart .. strstart+2] in the
+             * dictionary, and set hash_head to the head of the hash chain:
+             */
+            hash_head = 0;
+            if (s.lookahead >= MinMatch)
+            {
+                InsertString(s, s.strstart, ref hash_head);
+            }
 
-                    // Find the longest match, discarding those <= prev_length.
-                    s.prev_length = s.match_length;
-                    s.prev_match = s.match_start;
+            // Find the longest match, discarding those <= prev_length.
+            s.prev_length = s.match_length;
+            s.prev_match = s.match_start;
+            s.match_length = MinMatch - 1;
+
+            if (hash_head != 0 && s.prev_length < s.max_lazy_match &&
+                s.strstart - hash_head <= MaxDist(s))
+            {
+                /* To simplify the code, we prevent matches with the string
+                 * of window index 0 (in particular we have to avoid a match
+                 * of the string with itself at the start of the input file).
+                 */
+                s.match_length = LongestMatch(s, hash_head, (byte*)netUnsafe.AsPointer(ref window));
+                // LongestMatch() sets match_start
+
+                if (s.match_length <= 5 && (s.strategy == Z_FILTERED
+                    || s.match_length == MinMatch && s.strstart - s.match_start > TooFar))
+                {
+
+                    /* If prev_match is also MinMatch, match_start is garbage
+                     * but we will ignore the current match anyway.
+                     */
                     s.match_length = MinMatch - 1;
-
-                    if (hash_head != 0 && s.prev_length < s.max_lazy_match &&
-                        s.strstart - hash_head <= MaxDist(s))
-                    {
-                        /* To simplify the code, we prevent matches with the string
-                         * of window index 0 (in particular we have to avoid a match
-                         * of the string with itself at the start of the input file).
-                         */
-                        s.match_length = LongestMatch(s, hash_head, window);
-                        // LongestMatch() sets match_start
-
-                        if (s.match_length <= 5 && (s.strategy == Z_FILTERED
-                            || s.match_length == MinMatch && s.strstart - s.match_start > TooFar))
-                        {
-
-                            /* If prev_match is also MinMatch, match_start is garbage
-                             * but we will ignore the current match anyway.
-                             */
-                            s.match_length = MinMatch - 1;
-                        }
-                    }
-                    /* If there was a match at the previous step and the current
-                     * match is not better, output the previous match:
-                     */
-                    if (s.prev_length >= MinMatch && s.match_length <= s.prev_length)
-                    {
-                        uint max_insert = s.strstart + s.lookahead - MinMatch;
-                        // Do not insert strings in hash table beyond this.
-
-                        TreeTallyDist(s, (int)(s.strstart - 1 - s.prev_match), s.prev_length - MinMatch, out bflush);
-
-                        /* Insert in hash table all strings up to the end of the match.
-                         * strstart-1 and strstart are already inserted. If there is not
-                         * enough lookahead, the last two strings are not inserted in
-                         * the hash table.
-                         */
-                        s.lookahead -= s.prev_length - 1;
-                        s.prev_length -= 2;
-                        do
-                        {
-                            if (++s.strstart <= max_insert)
-                                InsertString(s, s.strstart, ref hash_head);
-                        } while (--s.prev_length != 0);
-                        s.match_available = 0;
-                        s.match_length = MinMatch - 1;
-                        s.strstart++;
-
-                        if (bflush && FlushBlock(s, 0, window, out state))
-                            return state;
-
-                    }
-                    else if (s.match_available != 0)
-                    {
-                        /* If there was no match at the previous position, output a
-                         * single literal. If there was a match but the current match
-                         * is longer, truncate the previous match to a single literal.
-                         */
-                        Trace.Tracevv($"{Convert.ToChar(s.window[s.strstart - 1])}");
-                        TreeTallyLit(s, s.window[s.strstart - 1], out bflush);
-                        if (bflush)
-                            FlushBlockOnly(s, 0, window);
-                        s.strstart++;
-                        s.lookahead--;
-                        if (s.strm.avail_out == 0)
-                            return BlockState.NeedMore;
-                    }
-                    else
-                    {
-                        // There is no previous match to compare with, wait for the next step to decide.
-                        s.match_available = 1;
-                        s.strstart++;
-                        s.lookahead--;
-                    }
                 }
-                Debug.Assert(flush != Z_NO_FLUSH, "no flush?");
-                if (s.match_available != 0)
+            }
+            /* If there was a match at the previous step and the current
+             * match is not better, output the previous match:
+             */
+            if (s.prev_length >= MinMatch && s.match_length <= s.prev_length)
+            {
+                int max_insert = s.strstart + s.lookahead - MinMatch;
+                // Do not insert strings in hash table beyond this.
+
+                TreeTallyDist(s, s.strstart - 1 - s.prev_match, s.prev_length - MinMatch, out bflush);
+
+                /* Insert in hash table all strings up to the end of the match.
+                 * strstart-1 and strstart are already inserted. If there is not
+                 * enough lookahead, the last two strings are not inserted in
+                 * the hash table.
+                 */
+                s.lookahead -= s.prev_length - 1;
+                s.prev_length -= 2;
+                do
                 {
-                    Trace.Tracevv($"{Convert.ToChar(s.window[s.strstart - 1])}");
-                    TreeTallyLit(s, window[s.strstart - 1], out bflush);
-                    s.match_available = 0;
-                }
-                s.insert = s.strstart < MinMatch - 1 ? s.strstart : MinMatch - 1;
-                if (flush == Z_FINISH)
-                {
-                    if (FlushBlock(s, 1, window, out state))
-                        return state;
-                    return BlockState.FinishDone;
-                }
-                if (s.sym_next != 0 && FlushBlock(s, 0, window, out state))
+                    if (++s.strstart <= max_insert)
+                        InsertString(s, s.strstart, ref hash_head);
+                } while (--s.prev_length != 0);
+                s.match_available = 0;
+                s.match_length = MinMatch - 1;
+                s.strstart++;
+
+                if (bflush && FlushBlock(s, 0, ref window, out state))
                     return state;
+
+            }
+            else if (s.match_available != 0)
+            {
+                /* If there was no match at the previous position, output a
+                 * single literal. If there was a match but the current match
+                 * is longer, truncate the previous match to a single literal.
+                 */
+                Trace.Tracevv($"{Convert.ToChar(s.window[s.strstart - 1])}");
+                TreeTallyLit(s, s.window[s.strstart - 1], out bflush);
+                if (bflush)
+                    FlushBlockOnly(s, 0, ref window);
+                s.strstart++;
+                s.lookahead--;
+                if (s.strm.avail_out == 0)
+                    return BlockState.NeedMore;
+            }
+            else
+            {
+                // There is no previous match to compare with, wait for the next step to decide.
+                s.match_available = 1;
+                s.strstart++;
+                s.lookahead--;
             }
         }
+        Debug.Assert(flush != Z_NO_FLUSH, "no flush?");
+        if (s.match_available != 0)
+        {
+            byte b = netUnsafe.Add(ref window, s.strstart - 1);
+            Trace.Tracevv($"{Convert.ToChar(b)}");
+            TreeTallyLit(s, b, out _);
+            s.match_available = 0;
+        }
+        s.insert = s.strstart < MinMatch - 1 ? s.strstart : MinMatch - 1;
+        if (flush == Z_FINISH)
+        {
+            if (FlushBlock(s, 1, ref window, out state))
+                return state;
+            return BlockState.FinishDone;
+        }
+        if (s.sym_next != 0 && FlushBlock(s, 0, ref window, out state))
+            return state;
+
         return BlockState.BlockDone;
     }
 }

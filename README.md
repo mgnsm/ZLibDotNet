@@ -157,9 +157,9 @@ Below is an exhaustive list of the functions and macros in the zlib compression 
 | `int inflateInit2 (z_streamp strm, int windowBits)` | `int InflateInit(ZStream strm, int windowBits)` | `int InflateInit(Unsafe.ZStream strm, int windowBits)` |
 | `int inflate (z_streamp strm, int flush)` | `int Inflate(ZStream strm, int flush)` | `int Inflate(Unsafe.ZStream strm, int flush)` |
 | `int inflateEnd (z_streamp strm)` | `int InflateEnd(ZStream strm)` | `int InflateEnd(ZStream strm)` |
-| `int deflateSetDictionary (z_streamp strm, const Bytef* dictionary, uInt dictLength)` | `int DeflateSetDictionary(ZStream strm, byte[] dictionary)` | `int DeflateSetDictionary(Unsafe.ZStream strm, byte* dictionary, uint dictLength)` |
+| `int deflateSetDictionary (z_streamp strm, const Bytef* dictionary, uInt dictLength)` | `int DeflateSetDictionary(ZStream strm, byte[] dictionary)` ||
 | `int deflateParams (z_streamp strm, int level, int strategy)` | `int DeflateParams(ZStream strm, int level, int strategy)` | `int DeflateParams(Unsafe.ZStream strm, int level, int strategy)` |
-| `int inflateSetDictionary (z_streamp strm, const Bytef* dictionary, uInt dictLength)` | `int InflateSetDictionary(ZStream strm, byte[] dictionary) / int InflateSetDictionary(ZStream strm, byte[] dictionary, int length)` | `int InflateSetDictionary(Unsafe.ZStream strm, byte* dictionary, uint dictLength)` |
+| `int inflateSetDictionary (z_streamp strm, const Bytef* dictionary, uInt dictLength)` | `int InflateSetDictionary(ZStream strm, byte[] dictionary) / int InflateSetDictionary(ZStream strm, byte[] dictionary, int length)` ||
 | `int inflateSync (z_streamp strm)` | `int InflateSync(ZStream strm)` | `int InflateSync(Unsafe.ZStream strm)` |
 | `int inflateReset (z_streamp strm)` | `int InflateReset(ZStream strm)` | `int InflateReset(Unsafe.ZStream strm)` |
 | `int inflateReset2 (z_streamp strm, int windowBits)` | `int InflateReset(ZStream strm, int windowBits)` | `int InflateReset(Unsafe.ZStream strm, int windowBits)` |
@@ -169,4 +169,4 @@ Below is an exhaustive list of the functions and macros in the zlib compression 
 | `uLong compressBound (uLong sourceLen)` | `uint CompressBound(uint sourceLen)` | `uint CompressBound(uint sourceLen)` |
 | `int uncompress (Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen)` | `int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen)` | `int Uncompress(byte* dest, uint* destLen, byte* source, uint sourceLen)` |
 | `int uncompress2 (Bytef *dest, uLongf *destLen, const Bytef *source, uLong *sourceLen)` | `int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out uint sourceLen, out uint destLen)` | `int Uncompress(byte* dest, uint* destLen, byte* source, uint* sourceLen)` |
-| `uLong adler32 (uLong adler, const Bytef *buf, uInt len)` | `uint Adler32(uint adler, ReadOnlySpan<byte> buf)` | `uint Adler32(uint adler, byte* buf, uint len)` |
+| `uLong adler32 (uLong adler, const Bytef *buf, uInt len)` | `uint Adler32(uint adler, ReadOnlySpan<byte> buf)` ||

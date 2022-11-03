@@ -221,7 +221,7 @@ internal static class Tree
     /// <summary>
     /// Determines the best encoding for the current block: dynamic trees, static trees or store, and writes out the encoded block.
     /// </summary>
-    internal static unsafe void FlushBlock(DeflateState s, byte* buf, uint stored_len, int last)
+    internal static void FlushBlock(DeflateState s, ref byte buf, uint stored_len, int last)
     {
         uint opt_lenb, static_lenb; // opt_len and static_len in bytes
         int max_blindex = 0;  // index of last bit length code of non zero freq */
@@ -259,11 +259,11 @@ internal static class Tree
         }
         else
         {
-            Debug.Assert(buf != null, "lost buf");
+            Debug.Assert(!netUnsafe.IsNullRef(ref buf), "lost buf");
             opt_lenb = static_lenb = stored_len + 5; /* force a stored block */
         }
 
-        if (stored_len + 4 <= opt_lenb && buf != null)
+        if (stored_len + 4 <= opt_lenb && !netUnsafe.IsNullRef(ref buf))
         {
             // 4: two words for the lengths
 
@@ -273,7 +273,7 @@ internal static class Tree
              * successful. If LIT_BUFSIZE <= WSIZE, it is never too late to
              * transform a block into a stored block.
              */
-            StoredBlock(s, buf, stored_len, last);
+            StoredBlock(s, ref buf, stored_len, last);
         }
         else if (s.strategy == Z_FIXED || static_lenb == opt_lenb)
         {
@@ -312,15 +312,15 @@ internal static class Tree
     /// <summary>
     /// Sends a stored block.
     /// </summary>
-    internal static unsafe void StoredBlock(DeflateState s, byte* buf, uint stored_len, int last)
+    internal static void StoredBlock(DeflateState s, ref byte buf, uint stored_len, int last)
     {
         const int STORED_BLOCK = 0;
         SendBits(s, (STORED_BLOCK << 1) + last, 3); // send block type
         Windup(s); // align on byte boundary
         PutShort(s, (ushort)stored_len);
         PutShort(s, (ushort)~stored_len);
-        if (buf != null && stored_len != 0)
-            netUnsafe.CopyBlock(ref MemoryMarshal.GetReference(s.pending_buf.AsSpan((int)s.pending)), ref netUnsafe.AsRef<byte>(buf), stored_len);
+        if (!netUnsafe.IsNullRef(ref buf) && stored_len != 0)
+            netUnsafe.CopyBlockUnaligned(ref MemoryMarshal.GetReference(s.pending_buf.AsSpan((int)s.pending)), ref buf, stored_len);
         s.pending += stored_len;
 #if DEBUG
         s.compressed_len = (s.compressed_len + 3 + 7) & unchecked((uint)~7);
@@ -336,21 +336,18 @@ internal static class Tree
     private static void InitBlock(DeflateState s)
     {
         // Initialize the trees.
-        unsafe
-        {
-            fixed (TreeNode* dyn_ltree = s.dyn_ltree, dyn_dtree = s.dyn_dtree, bl_tree = s.bl_tree)
-            {
-                int n;
-                for (n = 0; n < LCodes; n++)
-                    dyn_ltree[n].fc = 0;
-                for (n = 0; n < DCodes; n++)
-                    dyn_dtree[n].fc = 0;
-                for (n = 0; n < BlCodes; n++)
-                    bl_tree[n].fc = 0;
+        ref TreeNode dyn_ltree = ref MemoryMarshal.GetReference(s.dyn_ltree.AsSpan());
+        ref TreeNode dyn_dtree = ref MemoryMarshal.GetReference(s.dyn_dtree.AsSpan());
+        ref TreeNode bl_tree = ref MemoryMarshal.GetReference(s.bl_tree.AsSpan());
+        int n;
+        for (n = 0; n < LCodes; n++)
+            netUnsafe.Add(ref dyn_ltree, n).fc = 0;
+        for (n = 0; n < DCodes; n++)
+            netUnsafe.Add(ref dyn_dtree, n).fc = 0;
+        for (n = 0; n < BlCodes; n++)
+            netUnsafe.Add(ref bl_tree, n).fc = 0;
 
-                dyn_ltree[EndBlock].fc = 1;
-            }
-        }
+        netUnsafe.Add(ref dyn_ltree, EndBlock).fc = 1;
 
         s.opt_len = s.static_len = 0;
         s.sym_next = s.matches = 0;

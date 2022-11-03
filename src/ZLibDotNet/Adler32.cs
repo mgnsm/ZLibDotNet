@@ -8,7 +8,7 @@ internal static class Adler32
     /// <summary>
     /// Computes the Adler-32 checksum of a data stream.
     /// </summary>
-    internal static unsafe uint Update(uint adler, byte* buf, uint len)
+    internal static uint Update(uint adler, ref byte buf, uint len)
     {
         const ushort Base = 65521; // largest prime smaller than 65536
 
@@ -19,7 +19,7 @@ internal static class Adler32
         // in case user likes doing a byte at a time, keep it fast
         if (len == 1)
         {
-            adler += buf[0];
+            adler += buf;
             if (adler >= Base)
                 adler -= Base;
             sum2 += adler;
@@ -29,7 +29,7 @@ internal static class Adler32
         }
 
         // initial Adler-32 value (deferred check for len == 1 speed)
-        if (buf == null)
+        if (netUnsafe.IsNullRef(ref buf))
             return 1U;
 
         // in case short lengths are provided, keep it somewhat fast
@@ -37,7 +37,8 @@ internal static class Adler32
         {
             while (len-- > 0)
             {
-                adler += *buf++;
+                adler += buf;
+                buf = ref netUnsafe.Add(ref buf, 1);
                 sum2 += adler;
             }
             if (adler >= Base)
@@ -56,23 +57,23 @@ internal static class Adler32
             n = NMAX / 16; // NMAX is divisible by 16
             do
             {
-                adler += buf[0]; sum2 += adler; // 16 sums unrolled
-                adler += buf[1]; sum2 += adler;
-                adler += buf[2]; sum2 += adler;
-                adler += buf[3]; sum2 += adler;
-                adler += buf[4]; sum2 += adler;
-                adler += buf[5]; sum2 += adler;
-                adler += buf[6]; sum2 += adler;
-                adler += buf[7]; sum2 += adler;
-                adler += buf[8]; sum2 += adler;
-                adler += buf[9]; sum2 += adler;
-                adler += buf[10]; sum2 += adler;
-                adler += buf[11]; sum2 += adler;
-                adler += buf[12]; sum2 += adler;
-                adler += buf[13]; sum2 += adler;
-                adler += buf[14]; sum2 += adler;
-                adler += buf[15]; sum2 += adler;
-                buf += 16;
+                adler += buf; sum2 += adler; // 16 sums unrolled
+                adler += netUnsafe.Add(ref buf, 1); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 2); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 3); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 4); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 5); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 6); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 7); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 8); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 9); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 10); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 11); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 12); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 13); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 14); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 15); sum2 += adler;
+                buf = ref netUnsafe.Add(ref buf, 16);
             } while (--n > 0);
             adler %= Base;
             sum2 %= Base;
@@ -84,27 +85,28 @@ internal static class Adler32
             while (len >= 16)
             {
                 len -= 16;
-                adler += buf[0]; sum2 += adler;
-                adler += buf[1]; sum2 += adler;
-                adler += buf[2]; sum2 += adler;
-                adler += buf[3]; sum2 += adler;
-                adler += buf[4]; sum2 += adler;
-                adler += buf[5]; sum2 += adler;
-                adler += buf[6]; sum2 += adler;
-                adler += buf[7]; sum2 += adler;
-                adler += buf[8]; sum2 += adler;
-                adler += buf[9]; sum2 += adler;
-                adler += buf[10]; sum2 += adler;
-                adler += buf[11]; sum2 += adler;
-                adler += buf[12]; sum2 += adler;
-                adler += buf[13]; sum2 += adler;
-                adler += buf[14]; sum2 += adler;
-                adler += buf[15]; sum2 += adler;
-                buf += 16;
+                adler += buf; sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 1); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 2); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 3); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 4); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 5); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 6); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 7); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 8); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 9); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 10); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 11); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 12); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 13); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 14); sum2 += adler;
+                adler += netUnsafe.Add(ref buf, 15); sum2 += adler;
+                buf = ref netUnsafe.Add(ref buf, 16);
             }
             while (len-- > 0)
             {
-                adler += *buf++;
+                adler += buf;
+                buf = ref netUnsafe.Add(ref buf, 1);
                 sum2 += adler;
             }
             adler %= Base;

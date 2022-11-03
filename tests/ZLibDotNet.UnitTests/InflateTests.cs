@@ -443,28 +443,24 @@ public class InflateTests
         ushort[] work = new ushort[16];
         Code[] table = new Code[Inflater.EnoughDists];
 
-        uint bits;
+        int bits;
         for (bits = 0; bits < 15; bits++)
             lens[bits] = (ushort)(bits + 1);
         lens[15] = 15;
         bits = 15;
 
+        ref ushort ptrToLens = ref lens[0];
+        ref ushort ptrToWork = ref work[0];
         ref Code ptrToTable = ref table[0];
-        unsafe
-        {
-            fixed (ushort* ptrToLens = lens)
-            fixed (ushort* ptrToWork = work)
-            {
-                // Call InflateTable() directly in order to manifest not-enough errors, since zlib ensures that enough is always enough.
-                ref Code next = ref ptrToTable;
-                int offset = 0;
-                Assert.AreEqual(1, Inflater.InflateTable(CodeType.Dists, ptrToLens, 16, ref next, ref bits, ptrToWork, ref offset));
 
-                next = ptrToTable;
-                bits = 1;
-                Assert.AreEqual(1, Inflater.InflateTable(CodeType.Dists, ptrToLens, 16, ref next, ref bits, ptrToWork, ref offset));
-            }
-        }
+        // Call InflateTable() directly in order to manifest not-enough errors, since zlib ensures that enough is always enough.
+        ref Code next = ref ptrToTable;
+        int offset = 0;
+        Assert.AreEqual(1, Inflater.InflateTable(CodeType.Dists, ref ptrToLens, 16, ref next, ref bits, ref ptrToWork, ref offset));
+
+        next = ptrToTable;
+        bits = 1;
+        Assert.AreEqual(1, Inflater.InflateTable(CodeType.Dists, ref ptrToLens, 16, ref next, ref bits, ref ptrToWork, ref offset));
     }
 
     [TestMethod]
