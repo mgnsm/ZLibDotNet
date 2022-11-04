@@ -181,8 +181,8 @@ public interface IZLib
     /// <param name="dest">The destination buffer.</param>
     /// <param name="destLen">The actual size of the compressed data upon exit.</param>
     /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer.</returns>
-    /// <remarks><see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out uint)"/> is equivalent to <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out uint, int)"/> with a level parameter of <see cref="Z_DEFAULT_COMPRESSION"/>.</remarks>
-    int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen);
+    /// <remarks><see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out int)"/> is equivalent to <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out int, int)"/> with a level parameter of <see cref="Z_DEFAULT_COMPRESSION"/>.</remarks>
+    int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out int destLen);
 
     /// <summary>
     /// Compresses the source buffer into the destination buffer.
@@ -192,14 +192,14 @@ public interface IZLib
     /// <param name="destLen">The actual size of the compressed data upon exit.</param>
     /// <param name="level">The compression level.</param>
     /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer.</returns>
-    int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen, int level);
+    int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out int destLen, int level);
 
     /// <summary>
     /// Calculates an upper bound on the compressed size of a destination buffer.
     /// </summary>
     /// <param name="sourceLen">The number of bytes to be compressed.</param>
     /// <returns>An upper bound on the compressed size after compressing <paramref name="sourceLen"/> bytes.</returns>
-    /// <remarks>It would be used before a <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out uint)"/> or <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out uint, int)"/> call to allocate the destination buffer.</remarks>
+    /// <remarks>It would be used before a <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out int)"/> or <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out int, int)"/> call to allocate the destination buffer.</remarks>
     uint CompressBound(uint sourceLen);
 
     /// <summary>
@@ -210,7 +210,7 @@ public interface IZLib
     /// <param name="destLen">The actual size of the uncompressed data upon exit.</param>
     /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer, or <see cref="Z_DATA_ERROR"/> if the input data was corrupted or incomplete.</returns>
     /// <remarks>In the case where there is not enough room, the method will fill the destination buffer with the uncompressed data up to that point.</remarks>
-    int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen);
+    int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out int destLen);
 
     /// <summary>
     /// Decompresses the source buffer into the destination buffer.
@@ -221,7 +221,7 @@ public interface IZLib
     /// <param name="destLen">The actual size of the uncompressed data upon exit.</param>
     /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer, or <see cref="Z_DATA_ERROR"/> if the input data was corrupted or incomplete.</returns>
     /// <remarks>In the case where there is not enough room, the method will fill the destination buffer with the uncompressed data up to that point.</remarks>
-    int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out uint sourceLen, out uint destLen);
+    int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out int sourceLen, out int destLen);
 
     /// <summary>
     /// Updates a running Adler-32 checksum and returns the updated checksum.

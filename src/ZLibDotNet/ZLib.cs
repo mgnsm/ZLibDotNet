@@ -490,8 +490,8 @@ public partial class ZLib : IZLib, Unsafe.IZLib
     /// <param name="dest">The destination buffer.</param>
     /// <param name="destLen">The actual size of the compressed data upon exit.</param>
     /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer.</returns>
-    /// <remarks><see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out uint)"/> is equivalent to <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out uint, int)"/> with a level parameter of <see cref="Z_DEFAULT_COMPRESSION"/>.</remarks>
-    public int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen) => Compress(source, dest, out destLen, Z_DEFAULT_COMPRESSION);
+    /// <remarks><see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out int)"/> is equivalent to <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out int, int)"/> with a level parameter of <see cref="Z_DEFAULT_COMPRESSION"/>.</remarks>
+    public int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out int destLen) => Compress(source, dest, out destLen, Z_DEFAULT_COMPRESSION);
 
     /// <summary>
     /// Compresses the source buffer into the destination buffer.
@@ -501,48 +501,21 @@ public partial class ZLib : IZLib, Unsafe.IZLib
     /// <param name="destLen">The actual size of the compressed data upon exit.</param>
     /// <param name="level">The compression level.</param>
     /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer.</returns>
-    public int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen, int level)
+    public int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out int destLen, int level)
     {
-        uint destinationLength = (uint)dest.Length;
-        unsafe
-        {
-            fixed (byte* src = source, dst = dest)
-            {
-                int ret = Compressor.Compress(dst, &destinationLength, src, (uint)source.Length, level);
-                destLen = destinationLength;
-                return ret;
-            }
-        }
+        int bytesCompressed = dest.Length;
+        int ret = Compressor.Compress(ref MemoryMarshal.GetReference(dest), ref bytesCompressed,
+            ref MemoryMarshal.GetReference(source), source.Length, level);
+        destLen = bytesCompressed;
+        return ret;
     }
-
-    /// <summary>
-    /// Compresses the source buffer into the destination buffer.
-    /// </summary>
-    /// <param name="dest">A pointer to the destination buffer.</param>
-    /// <param name="destLen">The total size of the destination buffer upon entry and the actual size of the compressed data upon exit.</param>
-    /// <param name="source">A pointer to the source buffer</param>
-    /// <param name="sourceLen">The byte length of the source buffer.</param>
-    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer.</returns>
-    /// <remarks><see cref="Compress(byte*, uint*, byte*, uint)"/> is equivalent to <see cref="Compress(byte*, uint*, byte*, uint, int)"/> with a level parameter of <see cref="Z_DEFAULT_COMPRESSION"/>.</remarks>
-    public unsafe int Compress(byte* dest, uint* destLen, byte* source, uint sourceLen) => Compressor.Compress(dest, destLen, source, sourceLen, Z_DEFAULT_COMPRESSION);
-
-    /// <summary>
-    /// Compresses the source buffer into the destination buffer.
-    /// </summary>
-    /// <param name="dest">A pointer to the destination buffer.</param>
-    /// <param name="destLen">The total size of the destination buffer upon entry and the actual size of the compressed data upon exit.</param>
-    /// <param name="source">A pointer to the source buffer</param>
-    /// <param name="sourceLen">The byte length of the source buffer.</param>
-    /// <param name="level">The compression level.</param>
-    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer.</returns>
-    public unsafe int Compress(byte* dest, uint* destLen, byte* source, uint sourceLen, int level) => Compressor.Compress(dest, destLen, source, sourceLen, level);
 
     /// <summary>
     /// Calculates an upper bound on the compressed size of a destination buffer.
     /// </summary>
     /// <param name="sourceLen">The number of bytes to be compressed.</param>
     /// <returns>An upper bound on the compressed size after compressing <paramref name="sourceLen"/> bytes.</returns>
-    /// <remarks>It would be used before a <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out uint)"/>, <see cref="Compress(byte*, uint*, byte*, uint)"/>, <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out uint, int)"/> or <see cref="Compress(byte*, uint*, byte*, uint, int)"/> call to allocate the destination buffer.</remarks>
+    /// <remarks>It would be used before a <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out int)"/> or <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out int, int)"/> call to allocate the destination buffer.</remarks>
     public uint CompressBound(uint sourceLen) => Compressor.CompressBound(sourceLen);
 
     /// <summary>
@@ -553,7 +526,7 @@ public partial class ZLib : IZLib, Unsafe.IZLib
     /// <param name="destLen">The actual size of the uncompressed data upon exit.</param>
     /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer, or <see cref="Z_DATA_ERROR"/> if the input data was corrupted or incomplete.</returns>
     /// <remarks>In the case where there is not enough room, the method will fill the destination buffer with the uncompressed data up to that point.</remarks>
-    public int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen) => Uncompress(source, dest, out _, out destLen);
+    public int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out int destLen) => Uncompress(source, dest, out _, out destLen);
 
     /// <summary>
     /// Decompresses the source buffer into the destination buffer.
@@ -564,43 +537,16 @@ public partial class ZLib : IZLib, Unsafe.IZLib
     /// <param name="destLen">The actual size of the uncompressed data upon exit.</param>
     /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer, or <see cref="Z_DATA_ERROR"/> if the input data was corrupted or incomplete.</returns>
     /// <remarks>In the case where there is not enough room, the method will fill the destination buffer with the uncompressed data up to that point.</remarks>
-    public int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out uint sourceLen, out uint destLen)
+    public int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out int sourceLen, out int destLen)
     {
-        uint souceLength = (uint)source.Length;
-        uint destinationLength = (uint)dest.Length;
-        unsafe
-        {
-            fixed (byte* src = source, dst = dest)
-            {
-                int ret = Compressor.Uncompress(dst, &destinationLength, src, &souceLength);
-                sourceLen = souceLength;
-                destLen = destinationLength;
-                return ret;
-            }
-        }
+        int souceLength = source.Length;
+        int destinationLength = dest.Length;
+        int ret = Compressor.Uncompress(ref MemoryMarshal.GetReference(dest), ref destinationLength,
+            ref MemoryMarshal.GetReference(source), ref souceLength);
+        sourceLen = souceLength;
+        destLen = destinationLength;
+        return ret;
     }
-
-    /// <summary>
-    /// Decompresses the source buffer into the destination buffer.
-    /// </summary>
-    /// <param name="dest">A pointer to the destination buffer.</param>
-    /// <param name="destLen">The total size of the destination buffer upon entry and the actual size of the uncompressed data upon exit.</param>
-    /// <param name="source">A pointer to the source buffer.</param>
-    /// <param name="sourceLen">The byte length of the source buffer.</param>
-    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer, or <see cref="Z_DATA_ERROR"/> if the input data was corrupted or incomplete.</returns>
-    /// <remarks>In the case where there is not enough room, the method will fill the destination buffer with the uncompressed data up to that point.</remarks>
-    public unsafe int Uncompress(byte* dest, uint* destLen, byte* source, uint sourceLen) => Compressor.Uncompress(dest, destLen, source, &sourceLen);
-
-    /// <summary>
-    /// Decompresses the source buffer into the destination buffer.
-    /// </summary>
-    /// <param name="dest">A pointer to the destination buffer.</param>
-    /// <param name="destLen">The total size of the destination buffer upon entry and the actual size of the uncompressed data upon exit.</param>
-    /// <param name="source">A pointer to the source buffer.</param>
-    /// <param name="sourceLen">The byte length of the source buffer upon entry and the number of source bytes consumed upon exit.</param>
-    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer, or <see cref="Z_DATA_ERROR"/> if the input data was corrupted or incomplete.</returns>
-    /// <remarks>In the case where there is not enough room, the method will fill the destination buffer with the uncompressed data up to that point.</remarks>
-    public unsafe int Uncompress(byte* dest, uint* destLen, byte* source, uint* sourceLen) => Compressor.Uncompress(dest, destLen, source, sourceLen);
 
     /// <summary>
     /// Updates a running Adler-32 checksum and returns the updated checksum.

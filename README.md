@@ -164,9 +164,9 @@ Below is an exhaustive list of the functions and macros in the zlib compression 
 | `int inflateReset (z_streamp strm)` | `int InflateReset(ZStream strm)` | `int InflateReset(Unsafe.ZStream strm)` |
 | `int inflateReset2 (z_streamp strm, int windowBits)` | `int InflateReset(ZStream strm, int windowBits)` | `int InflateReset(Unsafe.ZStream strm, int windowBits)` |
 | `int inflatePrime (z_streamp strm, int bits, int value)` | `int InflatePrime (ZStream strm, int bits, int value)` | `int InflatePrime (Unsafe.ZStream strm, int bits, int value)`|
-| `int compress (Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen)` | `int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen)` | `int Compress(byte* dest, uint* destLen, byte* source, uint sourceLen)` |
-| `int compress2 (Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen, int level)` | `int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen, int level)` | `int Compress(byte* dest, uint* destLen, byte* source, uint sourceLen, int level)` |
+| `int compress (Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen)` | `int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen)` ||
+| `int compress2 (Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen, int level)` | `int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen, int level)` ||
 | `uLong compressBound (uLong sourceLen)` | `uint CompressBound(uint sourceLen)` | `uint CompressBound(uint sourceLen)` |
-| `int uncompress (Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen)` | `int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen)` | `int Uncompress(byte* dest, uint* destLen, byte* source, uint sourceLen)` |
-| `int uncompress2 (Bytef *dest, uLongf *destLen, const Bytef *source, uLong *sourceLen)` | `int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out uint sourceLen, out uint destLen)` | `int Uncompress(byte* dest, uint* destLen, byte* source, uint* sourceLen)` |
+| `int uncompress (Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen)` | `int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen)` ||
+| `int uncompress2 (Bytef *dest, uLongf *destLen, const Bytef *source, uLong *sourceLen)` | `int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out uint sourceLen, out uint destLen)` ||
 | `uLong adler32 (uLong adler, const Bytef *buf, uInt len)` | `uint Adler32(uint adler, ReadOnlySpan<byte> buf)` ||

@@ -23,9 +23,9 @@ public class InflateTests
         Array.Copy(s_garbage, uncompr, s_garbage.Length);
 
         ZLib zlib = new();
-        Assert.AreEqual(Z_OK, zlib.Uncompress(compr, uncompr, out uint sourceLen, out uint destLen));
-        Assert.AreEqual(19U, sourceLen);
-        Assert.AreEqual(14U, destLen);
+        Assert.AreEqual(Z_OK, zlib.Uncompress(compr, uncompr, out int sourceLen, out int destLen));
+        Assert.AreEqual(19, sourceLen);
+        Assert.AreEqual(14, destLen);
         Assert.IsTrue(Enumerable.SequenceEqual(uncompr.TakeWhile(b => b != 0), s_hello), "bad uncompress");
     }
 

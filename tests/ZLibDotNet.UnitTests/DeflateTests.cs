@@ -18,8 +18,8 @@ public class DeflateTests
         byte[] dest = new byte[ComprLen];
 
         ZLib zlib = new();
-        Assert.AreEqual(Z_OK, zlib.Compress(source, dest, out uint destlen));
-        Assert.AreEqual(19U, destlen);
+        Assert.AreEqual(Z_OK, zlib.Compress(source, dest, out int destlen));
+        Assert.AreEqual(19, destlen);
         Assert.IsTrue(Enumerable.SequenceEqual(dest.Take(19),
             new byte[19] { 120, 156, 203, 72, 205, 201, 201, 215, 81, 200, 0, 81, 138, 12, 0, 38, 6, 4, 150 }));
     }

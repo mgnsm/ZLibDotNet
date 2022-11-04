@@ -230,7 +230,7 @@ internal static partial class Deflater
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static unsafe void PutByte(DeflateState s, byte c) =>
+    internal static void PutByte(DeflateState s, byte c) =>
         s.pending_buf[s.pending++] = c;
 
     private static bool DeflateStateCheck(Unsafe.ZStream strm)
@@ -733,7 +733,7 @@ internal static partial class Deflater
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe void TreeTallyLit(DeflateState s, byte c, out bool flush)
+    private static void TreeTallyLit(DeflateState s, byte c, out bool flush)
 #if DEBUG
     {
         s.pending_buf[s.lit_bufsize + s.sym_next++] = 0;
@@ -746,11 +746,10 @@ internal static partial class Deflater
         => flush = Tree.Tally(s, 0, c);
 #endif
 
-    private static unsafe BlockState DeflateRle(DeflateState s, int flush)
+    private static BlockState DeflateRle(DeflateState s, int flush)
     {
         bool bflush;        // set if current block must be flushed
         uint prev;          // byte at distance one to match
-        byte* scan, strend; // scan goes up to strend for length of run
         BlockState state;
 
         ref byte window = ref MemoryMarshal.GetReference(s.window.AsSpan());
@@ -773,23 +772,29 @@ internal static partial class Deflater
             s.match_length = 0;
             if (s.lookahead >= MinMatch && s.strstart > 0)
             {
-                scan = (byte*)netUnsafe.AsPointer(ref window) + s.strstart - 1;
-                prev = *scan;
-                if (prev == *++scan && prev == *++scan && prev == *++scan)
+                ref byte scan = ref netUnsafe.Add(ref window, s.strstart - 1); // scan goes up to strend for length of run
+                prev = scan;
+                if (prev == (scan = ref netUnsafe.Add(ref scan, 1))
+                    && prev == (scan = ref netUnsafe.Add(ref scan, 1))
+                    && prev == (scan = ref netUnsafe.Add(ref scan, 1)))
                 {
-                    strend = (byte*)netUnsafe.AsPointer(ref window) + s.strstart + MaxMatch;
+                    ref byte strend = ref netUnsafe.Add(ref window, s.strstart + MaxMatch);
                     do
                     {
-                    } while (prev == *++scan && prev == *++scan &&
-                             prev == *++scan && prev == *++scan &&
-                             prev == *++scan && prev == *++scan &&
-                             prev == *++scan && prev == *++scan &&
-                             scan < strend);
-                    s.match_length = MaxMatch - (int)(strend - scan);
+                    } while (prev == (scan = ref netUnsafe.Add(ref scan, 1))
+                        && prev == (scan = ref netUnsafe.Add(ref scan, 1))
+                        && prev == (scan = ref netUnsafe.Add(ref scan, 1))
+                        && prev == (scan = ref netUnsafe.Add(ref scan, 1))
+                        && prev == (scan = ref netUnsafe.Add(ref scan, 1))
+                        && prev == (scan = ref netUnsafe.Add(ref scan, 1))
+                        && prev == (scan = ref netUnsafe.Add(ref scan, 1))
+                        && prev == (scan = ref netUnsafe.Add(ref scan, 1))
+                        && netUnsafe.IsAddressLessThan(ref scan, ref strend));
+                    s.match_length = MaxMatch - (int)netUnsafe.ByteOffset(ref scan, ref strend);
                     if (s.match_length > s.lookahead)
                         s.match_length = s.lookahead;
                 }
-                Debug.Assert(scan <= (byte*)netUnsafe.AsPointer(ref window) + (s.window_size - 1), "wild scan");
+                Debug.Assert(netUnsafe.IsAddressGreaterThan(ref netUnsafe.Add(ref window, s.window_size - 1), ref scan), "wild scan");
             }
 
             // Emit match if have run of MinMatch or longer, else emit literal
@@ -827,7 +832,7 @@ internal static partial class Deflater
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe void TreeTallyDist(DeflateState s, int distance, int length, out bool flush)
+    private static void TreeTallyDist(DeflateState s, int distance, int length, out bool flush)
 #if DEBUG
     {
         byte len = (byte)length;
@@ -855,7 +860,7 @@ internal static partial class Deflater
         };
     }
 
-    private static unsafe BlockState DeflateFast(DeflateState s, int flush)
+    private static BlockState DeflateFast(DeflateState s, int flush)
     {
         int hash_head; // head of the hash chain
         bool bflush;    // set if current block must be flushed
@@ -894,7 +899,7 @@ internal static partial class Deflater
                  * of window index 0 (in particular we have to avoid a match
                  * of the string with itself at the start of the input file).
                  */
-                s.match_length = LongestMatch(s, hash_head, (byte*)netUnsafe.AsPointer(ref window));
+                s.match_length = LongestMatch(s, hash_head, ref window);
                 // LongestMatch() sets match_start
             }
             if (s.match_length >= MinMatch)
@@ -966,22 +971,21 @@ internal static partial class Deflater
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static int MaxDist(DeflateState s) => s.w_size - MinLookAhead;
 
-    private static unsafe int LongestMatch(DeflateState s, int cur_match, byte* window)
+    private static int LongestMatch(DeflateState s, int cur_match, ref byte window)
     {
         uint chain_length = s.max_chain_length; // max hash chain length
-        byte* scan = window + s.strstart;       // current string
-        byte* match;                            // matched string
+        ref byte scan = ref netUnsafe.Add(ref window, s.strstart); // current string
         int len;                                // length of current match
-        int best_len = s.prev_length;      // best match length so far
+        int best_len = s.prev_length;           // best match length so far
         int nice_match = s.nice_match;          // stop if match long enough
         int limit = s.strstart > MaxDist(s) ? s.strstart - MaxDist(s) : 0;
         /* Stop when cur_match becomes <= limit. To simplify the code,
          * we prevent matches with the string of window index 0.
          */
         int wmask = s.w_mask;
-        byte* strend = window + s.strstart + MaxMatch;
-        byte scan_end1 = scan[best_len - 1];
-        byte scan_end = scan[best_len];
+        ref byte strend = ref netUnsafe.Add(ref window, s.strstart + MaxMatch);
+        byte scan_end1 = netUnsafe.Add(ref scan, best_len - 1);
+        byte scan_end = netUnsafe.Add(ref scan, best_len);
 
         /* The code is optimized for HASH_BITS >= 8 and MaxMatch-2 multiple of 16.
          * It is easy to get rid of this optimization if necessary.
@@ -1004,7 +1008,7 @@ internal static partial class Deflater
         do
         {
             Debug.Assert(cur_match < s.strstart, "no future");
-            match = window + cur_match;
+            ref byte match = ref netUnsafe.Add(ref window, cur_match); // matched string
 
             /* Skip to next match if the match length cannot increase
              * or if the match length is less than 2.  Note that the checks below
@@ -1015,10 +1019,10 @@ internal static partial class Deflater
              * the output of deflate is not affected by the uninitialized values.
              */
 
-            if (match[best_len] != scan_end
-                || match[best_len - 1] != scan_end1
-                || *match != *scan
-                || *++match != scan[1])
+            if (netUnsafe.Add(ref match, best_len) != scan_end
+                || netUnsafe.Add(ref match, best_len - 1) != scan_end1
+                || match != scan
+                || (match = ref netUnsafe.Add(ref match, 1)) != netUnsafe.Add(ref scan, 1))
                 continue;
 
             /* The check at best_len-1 can be removed because it will be made
@@ -1027,26 +1031,30 @@ internal static partial class Deflater
              * are always equal when the other bytes match, given that
              * the hash keys are equal and that HASH_BITS >= 8.
              */
-            scan += 2;
-            match++;
+            scan = ref netUnsafe.Add(ref scan, 2);
+            match = ref netUnsafe.Add(ref match, 1);
 
-            Debug.Assert(*scan == *match, "match[2]?");
+            Debug.Assert(scan == match, "match[2]?");
 
             /* We check for insufficient lookahead only every 8th comparison;
              * the 256th check will be made at strstart+258.
              */
             do
             {
-            } while (*++scan == *++match && *++scan == *++match &&
-                     *++scan == *++match && *++scan == *++match &&
-                     *++scan == *++match && *++scan == *++match &&
-                     *++scan == *++match && *++scan == *++match &&
-                     scan < strend);
+            } while ((scan = ref netUnsafe.Add(ref scan, 1)) == (match = ref netUnsafe.Add(ref match, 1))
+                && (scan = ref netUnsafe.Add(ref scan, 1)) == (match = ref netUnsafe.Add(ref match, 1))
+                && (scan = ref netUnsafe.Add(ref scan, 1)) == (match = ref netUnsafe.Add(ref match, 1))
+                && (scan = ref netUnsafe.Add(ref scan, 1)) == (match = ref netUnsafe.Add(ref match, 1))
+                && (scan = ref netUnsafe.Add(ref scan, 1)) == (match = ref netUnsafe.Add(ref match, 1))
+                && (scan = ref netUnsafe.Add(ref scan, 1)) == (match = ref netUnsafe.Add(ref match, 1))
+                && (scan = ref netUnsafe.Add(ref scan, 1)) == (match = ref netUnsafe.Add(ref match, 1))
+                && (scan = ref netUnsafe.Add(ref scan, 1)) == (match = ref netUnsafe.Add(ref match, 1))
+                && netUnsafe.IsAddressLessThan(ref scan, ref strend));
 
             Debug.Assert(scan <= window + (s.window_size - 1), "wild scan");
 
-            len = MaxMatch - (int)(strend - scan);
-            scan = strend - MaxMatch;
+            len = MaxMatch - (int)netUnsafe.ByteOffset(ref scan, ref strend);
+            scan = ref netUnsafe.Subtract(ref strend, MaxMatch);
 
             if (len > best_len)
             {
@@ -1054,8 +1062,8 @@ internal static partial class Deflater
                 best_len = len;
                 if (len >= nice_match)
                     break;
-                scan_end1 = scan[best_len - 1];
-                scan_end = scan[best_len];
+                scan_end1 = netUnsafe.Add(ref scan, best_len - 1);
+                scan_end = netUnsafe.Add(ref scan, best_len);
             }
         } while ((cur_match = netUnsafe.Add(ref prev, cur_match & wmask)) > limit && --chain_length != 0);
 
@@ -1065,7 +1073,7 @@ internal static partial class Deflater
         return s.lookahead;
     }
 
-    private static unsafe BlockState DeflateSlow(DeflateState s, int flush)
+    private static BlockState DeflateSlow(DeflateState s, int flush)
     {
         int hash_head; // head of hash chain
         bool bflush;    // set if current block must be flushed
@@ -1112,7 +1120,7 @@ internal static partial class Deflater
                  * of window index 0 (in particular we have to avoid a match
                  * of the string with itself at the start of the input file).
                  */
-                s.match_length = LongestMatch(s, hash_head, (byte*)netUnsafe.AsPointer(ref window));
+                s.match_length = LongestMatch(s, hash_head, ref window);
                 // LongestMatch() sets match_start
 
                 if (s.match_length <= 5 && (s.strategy == Z_FILTERED

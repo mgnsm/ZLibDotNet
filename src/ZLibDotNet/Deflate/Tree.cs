@@ -830,7 +830,7 @@ internal static class Tree
     /// <param name="dist">The distance of matched string.</param>
     /// <param name="lc">The match length - MIN_MATCH or unmatched char (if dist==0).</param>
     /// <returns><see langword="true"/> if the current block must be flushed.</returns>
-    internal static unsafe bool Tally(DeflateState s, uint dist, uint lc)
+    internal static bool Tally(DeflateState s, uint dist, uint lc)
     {
         s.pending_buf[s.lit_bufsize + s.sym_next++] = (byte)dist;
         s.pending_buf[s.lit_bufsize + s.sym_next++] = (byte)(dist >> 8);
