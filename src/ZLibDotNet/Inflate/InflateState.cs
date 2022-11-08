@@ -4,13 +4,13 @@
 namespace ZLibDotNet.Inflate;
 
 /// <summary>
-/// State maintained between <see cref="ZLib.Inflate(Unsafe.ZStream, int)"/> calls.
+/// State maintained between <see cref="ZLib.Inflate(ZStream, int)"/> calls.
 /// </summary>
 internal class InflateState
 {
     private const ushort Enough = Inflater.EnoughLens + Inflater.EnoughDists;
 
-    internal Unsafe.ZStream strm;   // reference back to this zlib stream
+    internal ZStream strm;          // reference back to this zlib stream
     internal InflateMode mode;      // current inflate mode
     internal int last;              // true if processing last block
     internal int wrap;              // bit 0 true for zlib, bit 1 true for gzip, bit 2 true to validate check value

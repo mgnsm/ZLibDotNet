@@ -1,11 +1,13 @@
 ﻿// Original code and comments Copyright (C) 1995-2022 Jean-loup Gailly and Mark Adler
 // Managed C#/.NET code Copyright (C) 2022 Magnus Montin
 
+using System.Runtime.CompilerServices;
+
 namespace ZLibDotNet.Deflate;
 
 internal static partial class Deflater
 {
-    internal static int DeflateReset(Unsafe.ZStream strm)
+    internal static int DeflateReset(ZStream strm)
     {
         int ret = DeflateResetKeep(strm);
         if (ret == Z_OK)
@@ -13,7 +15,7 @@ internal static partial class Deflater
         return ret;
     }
 
-    private static int DeflateResetKeep(Unsafe.ZStream strm)
+    private static int DeflateResetKeep(ZStream strm)
     {
         const int Z_UNKNOWN = 2;
 
@@ -33,7 +35,7 @@ internal static partial class Deflater
 
         s.status = InitState;
 
-        strm.Adler = Adler32.Update(0, ref netUnsafe.NullRef<byte>(), 0);
+        strm.Adler = Adler32.Update(0, ref Unsafe.NullRef<byte>(), 0);
 
         s.last_flush = -2;
 

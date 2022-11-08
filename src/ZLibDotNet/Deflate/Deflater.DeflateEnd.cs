@@ -7,7 +7,7 @@ namespace ZLibDotNet.Deflate;
 
 internal static partial class Deflater
 {
-    internal static int DeflateEnd(Unsafe.ZStream strm)
+    internal static int DeflateEnd(ZStream strm)
     {
         if (DeflateStateCheck(strm))
             return Z_STREAM_ERROR;

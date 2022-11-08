@@ -23,10 +23,13 @@ public class InflateTests
         Array.Copy(s_garbage, uncompr, s_garbage.Length);
 
         ZLib zlib = new();
-        Assert.AreEqual(Z_OK, zlib.Uncompress(compr, uncompr, out int sourceLen, out int destLen));
+        Assert.AreEqual(Z_OK, zlib.Uncompress(uncompr, out int destLen, compr, out int sourceLen));
         Assert.AreEqual(19, sourceLen);
         Assert.AreEqual(14, destLen);
         Assert.IsTrue(Enumerable.SequenceEqual(uncompr.TakeWhile(b => b != 0), s_hello), "bad uncompress");
+
+        Assert.AreEqual(Z_STREAM_ERROR, zlib.Uncompress(uncompr, out _, compr, -1));
+        Assert.AreEqual(Z_STREAM_ERROR, zlib.Uncompress(uncompr, out _, compr, compr.Length + 1));
     }
 
     [TestMethod]
@@ -377,9 +380,9 @@ public class InflateTests
     public void CoverWrap()
     {
         ZLib zlib = new();
-        Assert.AreEqual(Z_STREAM_ERROR, zlib.Inflate(default(ZStream), default));
-        Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateEnd(default(ZStream)));
-        Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateCopy(default(ZStream), default));
+        Assert.AreEqual(Z_STREAM_ERROR, zlib.Inflate(default, default));
+        Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateEnd(default));
+        Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateCopy(default, default));
         Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateInit(new ZStream(), 31));
 
         // A pointer to an empty array == null:
@@ -503,7 +506,7 @@ public class InflateTests
             if (ret == Z_NEED_DICT)
             {
                 Assert.AreEqual(Z_DATA_ERROR, zlib.InflateSetDictionary(strm, @in, 1));
-                strm.strm.inflateState.mode = InflateMode.Dict;
+                strm.inflateState.mode = InflateMode.Dict;
                 Assert.AreEqual(Z_OK, zlib.InflateSetDictionary(strm, @out, 0));
                 Assert.AreEqual(Z_BUF_ERROR, zlib.Inflate(strm, Z_NO_FLUSH));
             }

@@ -11,10 +11,10 @@ internal static partial class Deflater
     private const int DefaultMemLevel = 8;
     private static readonly ObjectPool<DeflateState> s_objectPool = new();
 
-    internal static int DeflateInit(Unsafe.ZStream strm, int level) =>
+    internal static int DeflateInit(ZStream strm, int level) =>
         DeflateInit(strm, level, Z_DEFLATED, MaxWindowBits, DefaultMemLevel, Z_DEFAULT_STRATEGY);
 
-    internal static int DeflateInit(Unsafe.ZStream strm, int level, int method, int windowBits, int memLevel, int strategy)
+    internal static int DeflateInit(ZStream strm, int level, int method, int windowBits, int memLevel, int strategy)
     {
         const int MaxMemLevel = 9;
         const int MinMatch = 3;

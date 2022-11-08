@@ -2,9 +2,7 @@
 ![Build Status](https://github.com/mgnsm/ZLibDotNet/actions/workflows/ci.yml/badge.svg)
 [![NuGet Badge](https://img.shields.io/nuget/v/ZLibDotNet.svg)](https://www.nuget.org/packages/ZLibDotNet/)
 
-A fully managed and [performant](tests/ZLibDotNet.Benchmarks) C#/.NET Standard 1.3 implementation of the [zlib compression library](https://www.zlib.net/), including both unsafe (operations involving pointers) and type-safe APIs for doing in-memory compression, decompression, and integrity checks of uncompressed data.
-
-Supports the zlib ([RFC (Request for Comments) 1950](https://datatracker.ietf.org/doc/html/rfc1950)) and raw deflate ([RFC 1951](https://datatracker.ietf.org/doc/html/rfc1951)) data formats but not the gzip or zip formats.
+A fully managed and [performant](tests/ZLibDotNet.Benchmarks) C#/.NET Standard 1.3 implementation of the [zlib compression library](https://www.zlib.net/) which provides in-memory compression, decompression, and integrity checks of uncompressed data in the zlib ([RFC (Request for Comments) 1950](https://datatracker.ietf.org/doc/html/rfc1950)) and raw deflate ([RFC 1951](https://datatracker.ietf.org/doc/html/rfc1951)) data formats (but not the gzip or zip formats).
 
 ## zlib support in .NET
 If you simply want to compress or decompress data in the zlib format in a .NET application, there is a `ZLibStream` class for doing this in .NET 6:
@@ -31,13 +29,13 @@ Besides being unsupported in .NET 5 and earlier versions, the `ZLibStream` class
 
 There are indeed other third-party and fully managed C#/.NET libraries that already provide this functionality but ZLibDotNet was implemented during the porting of a C/C++ library to C#/.NET where it was undesirable to rely on any existing third-party software. 
 
-It has been designed to provide an API surface that is very similar to the one that the original ported C library provides. This includes the ability to use pointers to data to be compressed or uncompressed, which comes in handy when you for example consume data from a socket frequently and want to minimze the amount of memory heap allocations your application performs.
+It has been designed to provide an API surface that is very similar to the one that the original ported C library provides.
 ## Installation
 ZLibDotNet is preferably installed using NuGet:
 
     PM> Install-Package ZLibDotNet
 ## Example
-Below is an example of how to compress and uncompress some sample data using the type-safe `ZLib` and `ZStream` classes in the `ZLibDotNet` namespace:
+Below is an example of how to compress and uncompress some sample data using the `ZLib` and `ZStream` classes in the `ZLibDotNet` namespace:
 ```cs
 using static ZLibDotNet.ZLib;
 using ZLibDotNet;
@@ -65,44 +63,6 @@ _ = zlib.InflateInit(zStream);
 _ = zlib.Inflate(zStream, Z_SYNC_FLUSH);
 
 Debug.Assert(Enumerable.SequenceEqual(inputData, uncomressedData));
-```
-## Unsafe Example
-There is also another `ZStream` class available in the `ZLibDotNet.Unsafe` namespace that lets you compress and uncompress data pointed to by pointers in an `unsafe` context:
-```cs
-byte[] compressedData = new byte[sourceLen];
-byte[] uncompressedData = new byte[s_inputData.Length];
-
-ZLib zlib = new();
-unsafe
-{
-    fixed (byte* input = s_inputData, compr = compressedData)
-    {
-        // Compress
-        Unsafe.ZStream zStream = new()
-        {
-            NextIn = input,
-            AvailableIn = (uint)s_inputData.Length,
-            NextOut = compr,
-            AvailableOut = (uint)compressedData.Length
-        };
-        _ = zlib.DeflateInit(zStream, Z_DEFAULT_COMPRESSION);
-        _ = zlib.Deflate(zStream, Z_FULL_FLUSH);
-        _ = zlib.DeflateEnd(zStream);
-
-        // Uncompress
-        zStream.NextIn = compr;
-        zStream.AvailableIn = zStream.TotalOut;
-        fixed (byte* uncompr = uncompressedData)
-        {
-            zStream.NextOut = uncompr;
-            zStream.AvailableOut = (uint) uncompressedData.Length;
-            _ = zlib.InflateInit(zStream);
-            _ = zlib.Inflate(zStream, Z_SYNC_FLUSH);
-        }
-
-        Debug.Assert(Enumerable.SequenceEqual(s_inputData, uncompressedData));
-    }
-}
 ```
 Check out the [unit tests](https://github.com/mgnsm/ZLibDotNet/tree/main/tests/ZLibDotNet.UnitTests) for more examples.
 ## Licensing and Support
@@ -147,26 +107,27 @@ Follow these steps when contributing code to this repository:
 8. Wait for the pull request to become validated and approved.
 ## Implemented/Ported APIs
 Below is an exhaustive list of the functions and macros in the zlib compression library that have currently been ported, and their C#/.NET counterparts.
-| C function/macro  | C# API | Unsafe C# API |
-| --- | --- | --- |
-| `int deflateInit(z_streamp strm, int level)` | `int DeflateInit(ZStream strm, int level)` | `int DeflateInit(Unsafe.ZStream strm, int level)` |
-| `int deflateInit2(z_streamp strm, int level, int method, int windowBits, int memLevel, int strategy)` | `int DeflateInit(ZStream strm, int level, int method, int windowBits, int memLevel, int strategy)` | `int DeflateInit(Unsafe.ZStream strm, int level, int method, int windowBits, int memLevel, int strategy)` |
-| `int deflate(z_streamp strm, int flush)` | `int Deflate(ZStream strm, int flush)` | `int Deflate(Unsafe.ZStream strm, int flush)` |
-| `int deflateEnd (z_streamp strm)` | `int DeflateEnd(ZStream strm)` | `int DeflateEnd(Unsafe.ZStream strm)` |
-| `int inflateInit (z_streamp strm)` | `int InflateInit(ZStream strm)` | `int InflateInit(Unsafe.ZStream strm)` |
-| `int inflateInit2 (z_streamp strm, int windowBits)` | `int InflateInit(ZStream strm, int windowBits)` | `int InflateInit(Unsafe.ZStream strm, int windowBits)` |
-| `int inflate (z_streamp strm, int flush)` | `int Inflate(ZStream strm, int flush)` | `int Inflate(Unsafe.ZStream strm, int flush)` |
-| `int inflateEnd (z_streamp strm)` | `int InflateEnd(ZStream strm)` | `int InflateEnd(ZStream strm)` |
-| `int deflateSetDictionary (z_streamp strm, const Bytef* dictionary, uInt dictLength)` | `int DeflateSetDictionary(ZStream strm, byte[] dictionary)` ||
-| `int deflateParams (z_streamp strm, int level, int strategy)` | `int DeflateParams(ZStream strm, int level, int strategy)` | `int DeflateParams(Unsafe.ZStream strm, int level, int strategy)` |
-| `int inflateSetDictionary (z_streamp strm, const Bytef* dictionary, uInt dictLength)` | `int InflateSetDictionary(ZStream strm, byte[] dictionary) / int InflateSetDictionary(ZStream strm, byte[] dictionary, int length)` ||
-| `int inflateSync (z_streamp strm)` | `int InflateSync(ZStream strm)` | `int InflateSync(Unsafe.ZStream strm)` |
-| `int inflateReset (z_streamp strm)` | `int InflateReset(ZStream strm)` | `int InflateReset(Unsafe.ZStream strm)` |
-| `int inflateReset2 (z_streamp strm, int windowBits)` | `int InflateReset(ZStream strm, int windowBits)` | `int InflateReset(Unsafe.ZStream strm, int windowBits)` |
-| `int inflatePrime (z_streamp strm, int bits, int value)` | `int InflatePrime (ZStream strm, int bits, int value)` | `int InflatePrime (Unsafe.ZStream strm, int bits, int value)`|
-| `int compress (Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen)` | `int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen)` ||
-| `int compress2 (Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen, int level)` | `int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen, int level)` ||
-| `uLong compressBound (uLong sourceLen)` | `uint CompressBound(uint sourceLen)` | `uint CompressBound(uint sourceLen)` |
-| `int uncompress (Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen)` | `int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen)` ||
-| `int uncompress2 (Bytef *dest, uLongf *destLen, const Bytef *source, uLong *sourceLen)` | `int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out uint sourceLen, out uint destLen)` ||
-| `uLong adler32 (uLong adler, const Bytef *buf, uInt len)` | `uint Adler32(uint adler, ReadOnlySpan<byte> buf)` ||
+| C function/macro  | C# API |
+| --- | --- |
+| `int deflateInit(z_streamp strm, int level)` | `int DeflateInit(ZStream strm, int level)` |
+| `int deflateInit2(z_streamp strm, int level, int method, int windowBits, int memLevel, int strategy)` | `int DeflateInit(ZStream strm, int level, int method, int windowBits, int memLevel, int strategy)` |
+| `int deflate(z_streamp strm, int flush)` | `int Deflate(ZStream strm, int flush)` |
+| `int deflateEnd (z_streamp strm)` | `int DeflateEnd(ZStream strm)` |
+| `int inflateInit (z_streamp strm)` | `int InflateInit(ZStream strm)` |
+| `int inflateInit2 (z_streamp strm, int windowBits)` | `int InflateInit(ZStream strm, int windowBits)` |
+| `int inflate (z_streamp strm, int flush)` | `int Inflate(ZStream strm, int flush)` |
+| `int inflateEnd (z_streamp strm)` | `int InflateEnd(ZStream strm)` |
+| `int deflateSetDictionary (z_streamp strm, const Bytef* dictionary, uInt dictLength)` | `int DeflateSetDictionary(ZStream strm, byte[] dictionary)` |
+| `int deflateParams (z_streamp strm, int level, int strategy)` | `int DeflateParams(ZStream strm, int level, int strategy)` |
+| `int inflateSetDictionary (z_streamp strm, const Bytef* dictionary, uInt dictLength)` | `int InflateSetDictionary(ZStream strm, byte[] dictionary) / int InflateSetDictionary(ZStream strm, byte[] dictionary, int length)` |
+| `int inflateSync (z_streamp strm)` | `int InflateSync(ZStream strm)` |
+| `int inflateCopy (z_streamp dest, z_streamp source)` | `int InflateCopy(ZStream source, ZStream dest)` |
+| `int inflateReset (z_streamp strm)` | `int InflateReset(ZStream strm)` |
+| `int inflateReset2 (z_streamp strm, int windowBits)` | `int InflateReset(ZStream strm, int windowBits)` |
+| `int inflatePrime (z_streamp strm, int bits, int value)` | `int InflatePrime (ZStream strm, int bits, int value)` |
+| `int compress (Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen)` | `int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen)` |
+| `int compress2 (Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen, int level)` | `int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen, int level)` |
+| `uLong compressBound (uLong sourceLen)` | `uint CompressBound(uint sourceLen)` |
+| `int uncompress (Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen)` | `int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out uint destLen)` |
+| `int uncompress2 (Bytef *dest, uLongf *destLen, const Bytef *source, uLong *sourceLen)` | `int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out uint sourceLen, out uint destLen)` |
+| `uLong adler32 (uLong adler, const Bytef *buf, uInt len)` | `uint Adler32(uint adler, ReadOnlySpan<byte> buf)` |

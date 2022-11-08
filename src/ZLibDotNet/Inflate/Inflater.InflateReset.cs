@@ -7,7 +7,7 @@ namespace ZLibDotNet.Inflate;
 
 internal static partial class Inflater
 {
-    internal static int InflateReset(Unsafe.ZStream strm)
+    internal static int InflateReset(ZStream strm)
     {
         if (InflateStateCheck(strm))
             return Z_STREAM_ERROR;
@@ -19,7 +19,7 @@ internal static partial class Inflater
         return InflateResetKeep(strm);
     }
 
-    internal static int InflateReset(Unsafe.ZStream strm, int windowBits)
+    internal static int InflateReset(ZStream strm, int windowBits)
     {
         if (InflateStateCheck(strm))
             return Z_STREAM_ERROR;
@@ -52,7 +52,7 @@ internal static partial class Inflater
         return InflateReset(strm);
     }
 
-    internal static int InflateResetKeep(Unsafe.ZStream strm)
+    internal static int InflateResetKeep(ZStream strm)
     {
         if (InflateStateCheck(strm))
             return Z_STREAM_ERROR;

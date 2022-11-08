@@ -45,29 +45,6 @@ public class UncompressionBenchmarks
 
     [Benchmark]
     [ArgumentsSource(nameof(Input))]
-    public unsafe void ZLibDotNetUnsafe(byte[] input)
-    {
-        byte[] outputBuffer = ArrayPool<byte>.Shared.Rent(OutputBufferSize);
-
-        fixed (byte* nextIn = input, nextOut = outputBuffer)
-        {
-            Unsafe.ZStream zStream = new()
-            {
-                NextIn = nextIn,
-                AvailableIn = (uint)input.Length,
-                NextOut = nextOut,
-                AvailableOut = OutputBufferSize
-            };
-            _ = s_zlib.InflateInit(zStream);
-            _ = s_zlib.Inflate(zStream, Z_NO_FLUSH);
-            _ = s_zlib.InflateEnd(zStream);
-        }
-
-        ArrayPool<byte>.Shared.Return(outputBuffer);
-    }
-
-    [Benchmark]
-    [ArgumentsSource(nameof(Input))]
     public void DotNet6(byte[] input)
     {
         byte[] outputBuffer = ArrayPool<byte>.Shared.Rent(OutputBufferSize);

@@ -2,6 +2,7 @@
 // Managed C#/.NET code Copyright (C) 2022 Magnus Montin
 
 using System;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using static ZLibDotNet.Deflate.Constants;
 
@@ -9,9 +10,9 @@ namespace ZLibDotNet.Deflate;
 
 internal static partial class Deflater
 {
-    internal static unsafe int DeflateSetDictionary(Unsafe.ZStream strm, ref byte dictionary, int dictLength)
+    internal static int DeflateSetDictionary(ZStream strm, byte[] dictionary, int dictLength)
     {
-        if (DeflateStateCheck(strm) || netUnsafe.IsNullRef(ref dictionary))
+        if (DeflateStateCheck(strm) || dictionary == null)
             return Z_STREAM_ERROR;
         DeflateState s = strm.deflateState;
 
@@ -21,9 +22,10 @@ internal static partial class Deflater
 
         // when using zlib wrappers, compute Adler-32 for provided dictionary
         if (wrap == 1)
-            strm.Adler = Adler32.Update(strm.Adler, ref dictionary, (uint)dictLength);
+            strm.Adler = Adler32.Update(strm.Adler, ref MemoryMarshal.GetReference(dictionary.AsSpan()), (uint)dictLength);
         s.wrap = 0; // avoid computing Adler-32 in ReadBuf
 
+        int next_in = 0;
         // if dictionary would fill window, just replace the history
         if (dictLength >= s.w_size)
         {
@@ -34,15 +36,17 @@ internal static partial class Deflater
                 s.block_start = 0;
                 s.insert = 0;
             }
-            dictionary = ref netUnsafe.Add(ref dictionary, dictLength - s.w_size); //use the tail
+            next_in = dictLength - s.w_size; //use the tail
             dictLength = s.w_size;
         }
 
         // insert dictionary into window and hash
         uint avail = strm.avail_in;
-        byte* next = strm.next_in;
+        byte[] input = strm._input;
+        int next = strm.next_in;
         strm.avail_in = (uint)dictLength;
-        strm.next_in = (byte*)netUnsafe.AsPointer(ref dictionary);
+        strm._input = dictionary;
+        strm.next_in = next_in;
 
         int str, n;
         ref byte window = ref MemoryMarshal.GetReference(s.window.AsSpan());
@@ -53,7 +57,7 @@ internal static partial class Deflater
             n = s.lookahead - (MinMatch - 1);
             do
             {
-                UpdateHash(s, ref s.ins_h, netUnsafe.Add(ref window, str + MinMatch - 1));
+                UpdateHash(s, ref s.ins_h, Unsafe.Add(ref window, str + MinMatch - 1));
                 s.prev[str & s.w_mask] = s.head[s.ins_h];
                 s.head[s.ins_h] = (ushort)str;
                 str++;
@@ -68,6 +72,7 @@ internal static partial class Deflater
         s.lookahead = 0;
         s.match_length = s.prev_length = MinMatch - 1;
         s.match_available = 0;
+        strm._input = input;
         strm.next_in = next;
         strm.avail_in = avail;
         s.wrap = wrap;

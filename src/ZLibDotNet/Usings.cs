@@ -1,1 +1,0 @@
-﻿global using netUnsafe = System.Runtime.CompilerServices.Unsafe;

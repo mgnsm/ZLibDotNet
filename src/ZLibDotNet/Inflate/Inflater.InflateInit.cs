@@ -9,7 +9,7 @@ internal static partial class Inflater
 {
     private static readonly ObjectPool<InflateState> s_objectPool = new();
 
-    internal static int InflateInit(Unsafe.ZStream strm, int windowBits)
+    internal static int InflateInit(ZStream strm, int windowBits)
     {
         if (strm == null)
             return Z_STREAM_ERROR;

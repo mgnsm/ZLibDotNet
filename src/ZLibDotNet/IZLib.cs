@@ -104,6 +104,16 @@ public interface IZLib
     int DeflateSetDictionary(ZStream strm, byte[] dictionary);
 
     /// <summary>
+    /// Initializes the compression dictionary from the given byte array without producing any compressed output.
+    /// </summary>
+    /// <param name="strm">An initialized compression stream.</param>
+    /// <param name="dictionary">The compression dictionary.</param>
+    /// <param name="dictLength">The number of bytes available in the compression dictionary <paramref name="dictionary"/>.</param>
+    /// <returns><see cref="Z_OK"/> if success, or <see cref="Z_STREAM_ERROR"/> if a parameter is invalid (e.g. <paramref name="dictionary"/> being <see langword="null"/>) or the stream state is inconsistent (for example if <see cref="Deflate(ZStream, int)"/> has already been called for this stream or if not at a block boundary for raw deflate).</returns>
+    /// <remarks>Upon return of this method, the <see cref="ZStream.Adler"/> property of the <paramref name="strm"/> is set to the Adler-32 value of the dictionary; the decompressor may later use this value to determine which dictionary has been used by the compressor.</remarks>
+    int DeflateSetDictionary(ZStream strm, byte[] dictionary, int dictLength);
+
+    /// <summary>
     /// Dynamically updates the compression level and compression strategy of a stream.
     /// </summary>
     /// <param name="strm">The stream to be updated.</param>
@@ -128,10 +138,10 @@ public interface IZLib
     /// </summary>
     /// <param name="strm">An initialized decompression stream.</param>
     /// <param name="dictionary">The decompression dictionary.</param>
-    /// <param name="length">The number of bytes available in the decompression dictionary <paramref name="dictionary"/>.</param>
+    /// <param name="dictLength">The number of bytes available in the decompression dictionary <paramref name="dictionary"/>.</param>
     /// <returns><see cref="Z_OK"/> if success, <see cref="Z_STREAM_ERROR"/> if a parameter is invalid (e.g. <paramref name="dictionary"/> being <see langword="null"/>) or the stream state is inconsistent, <see cref="Z_DATA_ERROR"/> if the given dictionary doesn't match the expected one (incorrect Adler-32 value).</returns>
     /// <remarks>This method does not perform any decompression: this will be done by subsequent calls of <see cref="Inflate(ZStream, int)"/>.</remarks>
-    public int InflateSetDictionary(ZStream strm, byte[] dictionary, int length);
+    public int InflateSetDictionary(ZStream strm, byte[] dictionary, int dictLength);
 
     /// <summary>
     /// Skips invalid compressed data until a possible full flush point can be found, or until all available input is skipped. No output is provided.
@@ -177,51 +187,54 @@ public interface IZLib
     /// <summary>
     /// Compresses the source buffer into the destination buffer.
     /// </summary>
-    /// <param name="source">The source buffer</param>
     /// <param name="dest">The destination buffer.</param>
-    /// <param name="destLen">The actual size of the compressed data upon exit.</param>
-    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer.</returns>
-    /// <remarks><see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out int)"/> is equivalent to <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out int, int)"/> with a level parameter of <see cref="Z_DEFAULT_COMPRESSION"/>.</remarks>
-    int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out int destLen);
+    /// <param name="destLen">The actual size of the compressed buffer upon exit.</param>
+    /// <param name="source">The source buffer.</param>
+    /// <param name="sourceLen">The byte length of the source buffer.</param>
+    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer, or Z_STREAM_ERROR if any of the level parameters are invalid.</returns>
+    /// <remarks><see cref="Compress(byte[], out int, byte[], int)"/> is equivalent to <see cref="Compress(byte[], out int, byte[], int, int)"/> with a level parameter of <see cref="Z_DEFAULT_COMPRESSION"/>.</remarks>
+    int Compress(byte[] dest, out int destLen, byte[] source, int sourceLen);
 
     /// <summary>
     /// Compresses the source buffer into the destination buffer.
     /// </summary>
-    /// <param name="source">The source buffer.</param>
     /// <param name="dest">The destination buffer.</param>
-    /// <param name="destLen">The actual size of the compressed data upon exit.</param>
+    /// <param name="destLen">The actual size of the compressed buffer upon exit.</param>
+    /// <param name="source">The source buffer.</param>
+    /// <param name="sourceLen">The byte length of the source buffer.</param>
     /// <param name="level">The compression level.</param>
-    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer.</returns>
-    int Compress(ReadOnlySpan<byte> source, Span<byte> dest, out int destLen, int level);
+    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer, or Z_STREAM_ERROR if any of the level parameters are invalid.</returns>
+    int Compress(byte[] dest, out int destLen, byte[] source, int sourceLen, int level);
 
     /// <summary>
     /// Calculates an upper bound on the compressed size of a destination buffer.
     /// </summary>
     /// <param name="sourceLen">The number of bytes to be compressed.</param>
     /// <returns>An upper bound on the compressed size after compressing <paramref name="sourceLen"/> bytes.</returns>
-    /// <remarks>It would be used before a <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out int)"/> or <see cref="Compress(ReadOnlySpan{byte}, Span{byte}, out int, int)"/> call to allocate the destination buffer.</remarks>
+    /// <remarks>It would be used before a <see cref="Compress(byte[], out int, byte[], int)"/> or <see cref="Compress(byte[], out int, byte[], int, int)"/> call to allocate the destination buffer.</remarks>
     uint CompressBound(uint sourceLen);
 
     /// <summary>
     /// Decompresses the source buffer into the destination buffer.
     /// </summary>
-    /// <param name="source">The source buffer.</param>
     /// <param name="dest">The destination buffer.</param>
     /// <param name="destLen">The actual size of the uncompressed data upon exit.</param>
-    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer, or <see cref="Z_DATA_ERROR"/> if the input data was corrupted or incomplete.</returns>
+    /// <param name="source">The source buffer.</param>
+    /// <param name="sourceLen">The number of source bytes to be consumed.</param>
+    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer, or <see cref="Z_DATA_ERROR"/> if the input data was corrupted or incomplete or if <paramref name="sourceLen"/> is negative or greater than the length of <paramref name="source"/>.</returns>
     /// <remarks>In the case where there is not enough room, the method will fill the destination buffer with the uncompressed data up to that point.</remarks>
-    int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out int destLen);
+    int Uncompress(byte[] dest, out int destLen, byte[] source, int sourceLen);
 
     /// <summary>
     /// Decompresses the source buffer into the destination buffer.
     /// </summary>
-    /// <param name="source">The source buffer.</param>
     /// <param name="dest">The destination buffer.</param>
-    /// <param name="sourceLen">The number of source bytes consumed upon exit.</param>
     /// <param name="destLen">The actual size of the uncompressed data upon exit.</param>
+    /// <param name="source">The source buffer.</param>
+    /// <param name="sourceLen">The number of source bytes consumed upon exit.</param>
     /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer, or <see cref="Z_DATA_ERROR"/> if the input data was corrupted or incomplete.</returns>
     /// <remarks>In the case where there is not enough room, the method will fill the destination buffer with the uncompressed data up to that point.</remarks>
-    int Uncompress(ReadOnlySpan<byte> source, Span<byte> dest, out int sourceLen, out int destLen);
+    int Uncompress(byte[] dest, out int destLen, byte[] source, out int sourceLen);
 
     /// <summary>
     /// Updates a running Adler-32 checksum and returns the updated checksum.

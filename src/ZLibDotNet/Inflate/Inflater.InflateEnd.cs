@@ -5,7 +5,7 @@ namespace ZLibDotNet.Inflate;
 
 internal static partial class Inflater
 {
-    internal static int InflateEnd(Unsafe.ZStream strm)
+    internal static int InflateEnd(ZStream strm)
     {
         if (InflateStateCheck(strm))
             return Z_STREAM_ERROR;

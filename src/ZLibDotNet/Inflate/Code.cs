@@ -1,6 +1,8 @@
 ﻿// Original code and comments Copyright (C) 1995-2005, 2010 Mark Adler
 // Managed C#/.NET code Copyright (C) 2022 Magnus Montin
 
+using System.Runtime.CompilerServices;
+
 namespace ZLibDotNet.Inflate;
 
 /* Structure for decoding tables. Each entry provides either the
@@ -29,5 +31,5 @@ internal readonly struct Code
         this.val = val;
     }
 
-    internal static int Size { get; } = netUnsafe.SizeOf<Code>();
+    internal static int Size { get; } = Unsafe.SizeOf<Code>();
 }

@@ -3,6 +3,7 @@
 
 using System;
 using System.Buffers;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace ZLibDotNet.Inflate;
@@ -50,15 +51,15 @@ internal static partial class Inflater
             ref ushort ptrToCount = ref MemoryMarshal.GetReference(count.AsSpan());
 
             // accumulate lengths for codes (assumes lens[] all in 0..MAXBITS)
-            netUnsafe.InitBlock(ref netUnsafe.As<ushort, byte>(ref ptrToCount), 0, Length * sizeof(ushort));
+            Unsafe.InitBlock(ref Unsafe.As<ushort, byte>(ref ptrToCount), 0, Length * sizeof(ushort));
 
             for (sym = 0; sym < codes; sym++)
-                netUnsafe.Add(ref ptrToCount, netUnsafe.Add(ref lens, sym))++;
+                Unsafe.Add(ref ptrToCount, Unsafe.Add(ref lens, sym))++;
 
             // bound code lengths, force root to be within code lengths
             root = bits;
             for (max = MaxBits; max >= 1; max--)
-                if (netUnsafe.Add(ref ptrToCount, max) != 0)
+                if (Unsafe.Add(ref ptrToCount, max) != 0)
                     break;
             if (root > max)
                 root = max;
@@ -66,15 +67,15 @@ internal static partial class Inflater
             {
                 here = new Code(64 /* invalid code marker */, 1, 0);
                 table = here; // make a table to force an error
-                table = ref netUnsafe.Add(ref table, 1);
+                table = ref Unsafe.Add(ref table, 1);
                 table = here;
-                table = ref netUnsafe.Add(ref table, 1);
+                table = ref Unsafe.Add(ref table, 1);
                 offset += 2;
                 bits = 1;
                 return 0; // no symbols, but wait for decoding to report error
             }
             for (min = 1; min < max; min++)
-                if (netUnsafe.Add(ref ptrToCount, min) != 0)
+                if (Unsafe.Add(ref ptrToCount, min) != 0)
                     break;
             if (root < min)
                 root = min;
@@ -84,7 +85,7 @@ internal static partial class Inflater
             for (len = 1; len <= MaxBits; len++)
             {
                 left <<= 1;
-                left -= netUnsafe.Add(ref ptrToCount, len);
+                left -= Unsafe.Add(ref ptrToCount, len);
                 if (left < 0)
                     return -1; // over-subscribed
             }
@@ -94,21 +95,21 @@ internal static partial class Inflater
             // generate offsets into symbol table for each length for sorting
             offs = ArrayPool<ushort>.Shared.Rent(Length);
             ref ushort ptrToOffs = ref MemoryMarshal.GetReference(offs.AsSpan());
-            netUnsafe.Add(ref ptrToOffs, 1) = 0;
+            Unsafe.Add(ref ptrToOffs, 1) = 0;
             for (len = 1; len < MaxBits; len++)
-                netUnsafe.Add(ref ptrToOffs, len + 1) = (ushort)(netUnsafe.Add(ref ptrToOffs, len) + netUnsafe.Add(ref ptrToCount, len));
+                Unsafe.Add(ref ptrToOffs, len + 1) = (ushort)(Unsafe.Add(ref ptrToOffs, len) + Unsafe.Add(ref ptrToCount, len));
 
             // sort symbols by length, by symbol order within each length
             for (sym = 0; sym < codes; sym++)
-                if (netUnsafe.Add(ref lens, sym) != 0)
-                    netUnsafe.Add(ref work, netUnsafe.Add(ref ptrToOffs, netUnsafe.Add(ref lens, sym))++) = (ushort)sym;
+                if (Unsafe.Add(ref lens, sym) != 0)
+                    Unsafe.Add(ref work, Unsafe.Add(ref ptrToOffs, Unsafe.Add(ref lens, sym))++) = (ushort)sym;
 
             ref ushort lbase = ref MemoryMarshal.GetReference(s_lbase.AsSpan());
             ref ushort lext = ref MemoryMarshal.GetReference(s_lext.AsSpan());
             ref ushort dbase = ref MemoryMarshal.GetReference(s_dbase.AsSpan());
             ref ushort dext = ref MemoryMarshal.GetReference(s_dext.AsSpan());
-            ref ushort @base = ref netUnsafe.NullRef<ushort>(); // base value table to use
-            ref ushort extra = ref netUnsafe.NullRef<ushort>(); // extra bits table to use
+            ref ushort @base = ref Unsafe.NullRef<ushort>(); // base value table to use
+            ref ushort extra = ref Unsafe.NullRef<ushort>(); // extra bits table to use
             int match; // use base and extra for symbol >= match
             // set up for code type
             switch (type)
@@ -151,12 +152,12 @@ internal static partial class Inflater
             {
                 // create table entry
                 byte temp = (byte)(len - drop);
-                ushort wsym = netUnsafe.Add(ref work, sym);
+                ushort wsym = Unsafe.Add(ref work, sym);
                 int diff = wsym - match;
                 if (wsym + 1 < match)
                     here = new Code(0, temp, wsym);
                 else if (wsym >= match)
-                    here = new Code((byte)netUnsafe.Add(ref extra, diff), temp, netUnsafe.Add(ref @base, diff));
+                    here = new Code((byte)Unsafe.Add(ref extra, diff), temp, Unsafe.Add(ref @base, diff));
                 else
                     here = new Code(32 + 64, temp, 0); // end of block
 
@@ -167,7 +168,7 @@ internal static partial class Inflater
                 do
                 {
                     fill -= incr;
-                    netUnsafe.Add(ref table, next + (huff >> drop) + fill) = here;
+                    Unsafe.Add(ref table, next + (huff >> drop) + fill) = here;
                 } while (fill != 0);
 
                 // backwards increment the len-bit code huff
@@ -184,11 +185,11 @@ internal static partial class Inflater
 
                 // go to next symbol, update count, len
                 sym++;
-                if (--netUnsafe.Add(ref ptrToCount, len) == 0)
+                if (--Unsafe.Add(ref ptrToCount, len) == 0)
                 {
                     if (len == max)
                         break;
-                    len = netUnsafe.Add(ref lens, netUnsafe.Add(ref work, sym));
+                    len = Unsafe.Add(ref lens, Unsafe.Add(ref work, sym));
                 }
 
                 // create new sub-table if needed
@@ -206,7 +207,7 @@ internal static partial class Inflater
                     left = 1 << curr;
                     while (curr + drop < max)
                     {
-                        left -= netUnsafe.Add(ref ptrToCount, curr + drop);
+                        left -= Unsafe.Add(ref ptrToCount, curr + drop);
                         if (left <= 0)
                             break;
                         curr++;
@@ -221,7 +222,7 @@ internal static partial class Inflater
 
                     // point entry in root table to sub-table
                     low = huff & mask;
-                    netUnsafe.Add(ref table, low) = new Code((byte)curr, (byte)root, (ushort)next);
+                    Unsafe.Add(ref table, low) = new Code((byte)curr, (byte)root, (ushort)next);
                 }
             }
 
@@ -229,7 +230,7 @@ internal static partial class Inflater
              * at most one remaining entry, since if the code is incomplete, the 
              * maximum code length that was allowed to get this far is one bit) */
             if (huff != 0)
-                netUnsafe.Add(ref table, next + huff) = new Code(64 /* invalid code marker */, (byte)(len - drop), 0);
+                Unsafe.Add(ref table, next + huff) = new Code(64 /* invalid code marker */, (byte)(len - drop), 0);
 
             // set return parameters
             offset += used;

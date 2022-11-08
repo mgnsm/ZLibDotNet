@@ -100,32 +100,36 @@ internal static partial class Inflater
     // permutation of code lengths
     private static readonly ushort[] s_order = new ushort[19] { 16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15 };
 
-    internal static unsafe int Inflate(Unsafe.ZStream strm, int flush)
+    internal static int Inflate(ZStream strm, int flush)
     {
         if (InflateStateCheck(strm)
-            || strm.next_out == null
-            || strm.next_in == null && strm.avail_in != 0)
+            || strm._output == null
+            || strm._input == null && strm.avail_in != 0)
             return Z_STREAM_ERROR;
 
         InflateState state = strm.inflateState;
         if (state.mode == InflateMode.Type) // Skip check
             state.mode = InflateMode.Typedo;
 
-        LocalState x = new(strm);
-        x.Load();
-
-        uint @in = x.have;  // save starting available input
-        uint @out = x.left; // ...and output
+        ref byte next = ref MemoryMarshal.GetReference(strm._input.AsSpan(strm.next_in)); // next input
+        ref byte put = ref MemoryMarshal.GetReference(strm._output.AsSpan(strm.next_out)); // next output
+        ref byte from = ref Unsafe.NullRef<byte>(); // where to copy match bytes from
+        ref ushort lens = ref MemoryMarshal.GetReference(state.lens.AsSpan());
+        ref ushort work = ref MemoryMarshal.GetReference(state.work.AsSpan());
+        ref byte window = ref MemoryMarshal.GetReference(state.window.AsSpan());
+        ref Code lencode = ref Unsafe.NullRef<Code>();
+        uint have = strm.avail_in;          // available input
+        uint left = strm.avail_out;         // ...and output
+        uint hold = strm.inflateState.hold; // bit buffer
+        uint bits = strm.inflateState.bits; // bits in bit buffer
+        uint @in = have;    // save starting available input
+        uint @out = left;   // ...and output
         uint copy;          // number of stored or match bytes to copy
-        byte* from;         // where to copy match bytes from
         Code here;          // current decoding table entry
         Code last;          // parent table entry
         uint len;           // length to copy for repeats, bits to drop
         int ret = Z_OK;
 
-        ref ushort lens = ref MemoryMarshal.GetReference(state.lens.AsSpan());
-        ref ushort work = ref MemoryMarshal.GetReference(state.work.AsSpan());
-        ref byte window = ref MemoryMarshal.GetReference(state.window.AsSpan());
         for (; ; )
             switch (state.mode)
             {
@@ -135,22 +139,30 @@ internal static partial class Inflater
                         state.mode = InflateMode.Typedo;
                         break;
                     }
-                    if (!x.NeedBits(16))
-                        goto inf_leave;
-                    if (((x.Bits(8) << 8) + (x.hold >> 8)) % 31 != 0)
+                    while (bits < 16)
+                    {
+                        if (have == 0)
+                            goto inf_leave;
+                        have--;
+                        hold += (uint)next << (int)bits;
+                        next = ref Unsafe.Add(ref next, 1);
+                        bits += 8;
+                    }
+                    if ((((hold & ((1U << (8)) - 1)) << 8) + (hold >> 8)) % 31 != 0)
                     {
                         strm.msg = "incorrect header check";
                         state.mode = InflateMode.Bad;
                         break;
                     }
-                    if (x.Bits(4) != Z_DEFLATED)
+                    if ((hold & ((1U << (4)) - 1)) != Z_DEFLATED)
                     {
                         strm.msg = "unknown compression method";
                         state.mode = InflateMode.Bad;
                         break;
                     }
-                    x.DropBits(4);
-                    len = x.Bits(4) + 8;
+                    hold >>= 4;
+                    bits -= 4;
+                    len = (hold & ((1U << (4)) - 1)) + 8;
                     if (state.wbits == 0)
                         state.wbits = len;
                     if (len > 15 || len > state.wbits)
@@ -162,24 +174,38 @@ internal static partial class Inflater
                     state.dmax = (uint)(1 << (int)len);
                     state.flags = 0; // indicate zlib header
                     Trace.Tracev("inflate:   zlib header ok\n");
-                    strm.Adler = state.check = Adler32.Update(0, ref netUnsafe.NullRef<byte>(), 0);
-                    state.mode = (x.hold & 0x200) != 0 ? InflateMode.DictId : InflateMode.Type;
-                    x.InitBits();
+                    strm.Adler = state.check = Adler32.Update(0, ref Unsafe.NullRef<byte>(), 0);
+                    state.mode = (hold & 0x200) != 0 ? InflateMode.DictId : InflateMode.Type;
+                    hold = 0;
+                    bits = 0;
                     break;
                 case InflateMode.DictId:
-                    if (!x.NeedBits(32))
-                        goto inf_leave;
-                    strm.Adler = state.check = ZSwap32(x.hold);
-                    x.InitBits();
+                    while (bits < 32)
+                    {
+                        if (have == 0)
+                            goto inf_leave;
+                        have--;
+                        hold += (uint)next << (int)bits;
+                        next = ref Unsafe.Add(ref next, 1);
+                        bits += 8;
+                    }
+                    strm.Adler = state.check = ZSwap32(hold);
+                    hold = 0;
+                    bits = 0;
                     state.mode = InflateMode.Dict;
                     goto case InflateMode.Dict;
                 case InflateMode.Dict:
                     if (state.havedict == 0)
                     {
-                        x.Restore();
+                        strm.next_out = (int)Unsafe.ByteOffset(ref MemoryMarshal.GetReference(strm._output.AsSpan()), ref put);
+                        strm.avail_out = left;
+                        strm.next_in = (int)Unsafe.ByteOffset(ref MemoryMarshal.GetReference(strm._input.AsSpan()), ref next);
+                        strm.avail_in = have;
+                        strm.inflateState.hold = hold;
+                        strm.inflateState.bits = bits;
                         return Z_NEED_DICT;
                     }
-                    strm.Adler = state.check = Adler32.Update(0, ref netUnsafe.NullRef<byte>(), 0);
+                    strm.Adler = state.check = Adler32.Update(0, ref Unsafe.NullRef<byte>(), 0);
                     state.mode = InflateMode.Type;
                     goto case InflateMode.Type;
                 case InflateMode.Type:
@@ -189,15 +215,24 @@ internal static partial class Inflater
                 case InflateMode.Typedo:
                     if (state.last != 0)
                     {
-                        x.ByteBits();
+                        hold >>= (int)(bits & 7);
+                        bits -= bits & 7;
                         state.mode = InflateMode.Check;
                         break;
                     }
-                    if (!x.NeedBits(3))
-                        goto inf_leave;
-                    state.last = (int)x.Bits(1);
-                    x.DropBits(1);
-                    switch (x.Bits(2))
+                    while (bits < 3)
+                    {
+                        if (have == 0)
+                            goto inf_leave;
+                        have--;
+                        hold += (uint)next << (int)bits;
+                        next = ref Unsafe.Add(ref next, 1);
+                        bits += 8;
+                    }
+                    state.last = (int)(hold & ((1U << (1)) - 1));
+                    hold >>= 1;
+                    bits--;
+                    switch (hold & ((1U << (2)) - 1))
                     {
                         case 0: // stored block
                             Trace.Tracev($"inflate:     stored block{(state.last != 0 ? " (last)" : "")}\n");
@@ -213,7 +248,8 @@ internal static partial class Inflater
                             state.mode = InflateMode.Len_; // decode codes
                             if (flush == Z_TREES)
                             {
-                                x.DropBits(2);
+                                hold >>= 2;
+                                bits -= 2;
                                 goto inf_leave;
                             }
                             break;
@@ -226,21 +262,31 @@ internal static partial class Inflater
                             state.mode = InflateMode.Bad;
                             break;
                     }
-                    x.DropBits(2);
+                    hold >>= 2;
+                    bits -= 2;
                     break;
                 case InflateMode.Stored:
-                    x.ByteBits(); // go to byte boundary
-                    if (!x.NeedBits(32))
-                        goto inf_leave;
-                    if ((x.hold & 0xffff) != ((x.hold >> 16) ^ 0xffff))
+                    hold >>= (int)(bits & 7); // go to byte boundary
+                    bits -= bits & 7;
+                    while (bits < 32)
+                    {
+                        if (have == 0)
+                            goto inf_leave;
+                        have--;
+                        hold += (uint)next << (int)bits;
+                        next = ref Unsafe.Add(ref next, 1);
+                        bits += 8;
+                    }
+                    if ((hold & 0xffff) != ((hold >> 16) ^ 0xffff))
                     {
                         strm.msg = "invalid stored block lengths";
                         state.mode = InflateMode.Bad;
                         break;
                     }
-                    state.length = x.hold & 0xffff;
+                    state.length = hold & 0xffff;
                     Trace.Tracev($"inflate:       stored length {state.length}\n");
-                    x.InitBits();
+                    hold = 0;
+                    bits = 0;
                     state.mode = InflateMode.Copy_;
                     if (flush == Z_TREES)
                         goto inf_leave;
@@ -252,17 +298,17 @@ internal static partial class Inflater
                     copy = state.length;
                     if (copy != 0)
                     {
-                        if (copy > x.have)
-                            copy = x.have;
-                        if (copy > x.left)
-                            copy = x.left;
+                        if (copy > have)
+                            copy = have;
+                        if (copy > left)
+                            copy = left;
                         if (copy == 0)
                             goto inf_leave;
-                        Buffer.MemoryCopy(x.next, x.put, copy, copy);
-                        x.have -= copy;
-                        x.next += copy;
-                        x.left -= copy;
-                        x.put += copy;
+                        Unsafe.CopyBlockUnaligned(ref put, ref next, copy);
+                        have -= copy;
+                        next = ref Unsafe.Add(ref next, (int)copy);
+                        left -= copy;
+                        put = ref Unsafe.Add(ref put, (int)copy);
                         state.length -= copy;
                         break;
                     }
@@ -270,14 +316,24 @@ internal static partial class Inflater
                     state.mode = InflateMode.Type;
                     break;
                 case InflateMode.Table:
-                    if (!x.NeedBits(14))
-                        goto inf_leave;
-                    state.nlen = (int)x.Bits(5) + 257;
-                    x.DropBits(5);
-                    state.ndist = (int)x.Bits(5) + 1;
-                    x.DropBits(5);
-                    state.ncode = x.Bits(4) + 4;
-                    x.DropBits(4);
+                    while (bits < 14)
+                    {
+                        if (have == 0)
+                            goto inf_leave;
+                        have--;
+                        hold += (uint)next << (int)bits;
+                        next = ref Unsafe.Add(ref next, 1);
+                        bits += 8;
+                    }
+                    state.nlen = (int)(hold & ((1U << (5)) - 1)) + 257;
+                    hold >>= 5;
+                    bits -= 5;
+                    state.ndist = (int)(hold & ((1U << (5)) - 1)) + 1;
+                    hold >>= 5;
+                    bits -= 5;
+                    state.ncode = (hold & ((1U << (4)) - 1)) + 4;
+                    hold >>= 4;
+                    bits -= 4;
                     if (state.nlen > 286 || state.ndist > 30)
                     {
                         strm.msg = "too many length or distance symbols";
@@ -291,10 +347,18 @@ internal static partial class Inflater
                 case InflateMode.LenLens:
                     while (state.have < state.ncode)
                     {
-                        if (!x.NeedBits(3))
-                            goto inf_leave;
-                        state.lens[s_order[state.have++]] = (ushort)x.Bits(3);
-                        x.DropBits(3);
+                        while (bits < 3)
+                        {
+                            if (have == 0)
+                                goto inf_leave;
+                            have--;
+                            hold += (uint)next << (int)bits;
+                            next = ref Unsafe.Add(ref next, 1);
+                            bits += 8;
+                        }
+                        state.lens[s_order[state.have++]] = (ushort)(hold & ((1U << (3)) - 1));
+                        hold >>= 3;
+                        bits -= 3;
                     }
                     while (state.have < 19)
                         state.lens[s_order[state.have++]] = 0;
@@ -313,55 +377,88 @@ internal static partial class Inflater
                     state.mode = InflateMode.CodeLens;
                     goto case InflateMode.CodeLens;
                 case InflateMode.CodeLens:
+                    lencode = ref MemoryMarshal.GetReference(state.lencode.AsSpan());
                     while (state.have < state.nlen + state.ndist)
                     {
                         for (; ; )
                         {
-                            here = state.lencode[x.Bits(state.lenbits)];
-                            if (here.bits <= x.bits)
+                            here = Unsafe.Add(ref lencode, (int)(hold & ((1 << (state.lenbits)) - 1)));
+                            if (here.bits <= bits)
                                 break;
-                            if (!x.PullByte())
+                            if (have == 0)
                                 goto inf_leave;
+                            have--;
+                            hold += (uint)next << (int)bits;
+                            next = ref Unsafe.Add(ref next, 1);
+                            bits += 8;
                         }
                         if (here.val < 16)
                         {
-                            x.DropBits(here.bits);
-                            state.lens[state.have++] = here.val;
+                            hold >>= here.bits;
+                            bits -= here.bits;
+                            Unsafe.Add(ref lens, (int)state.have++) = here.val;
                         }
                         else
                         {
                             if (here.val == 16)
                             {
-                                if (!x.NeedBits(here.bits + 2))
-                                    goto inf_leave;
-                                x.DropBits(here.bits);
+                                while (bits < here.bits + 2)
+                                {
+                                    if (have == 0)
+                                        goto inf_leave;
+                                    have--;
+                                    hold += (uint)next << (int)bits;
+                                    next = ref Unsafe.Add(ref next, 1);
+                                    bits += 8;
+                                }
+                                hold >>= here.bits;
+                                bits -= here.bits;
                                 if (state.have == 0)
                                 {
                                     strm.msg = "invalid bit length repeat";
                                     state.mode = InflateMode.Bad;
                                     break;
                                 }
-                                len = state.lens[state.have - 1];
-                                copy = 3 + x.Bits(2);
-                                x.DropBits(2);
+                                len = Unsafe.Add(ref lens, (int)(state.have - 1));
+                                copy = 3 + (hold & ((1U << (2)) - 1));
+                                hold >>= 2;
+                                bits -= 2;
                             }
                             else if (here.val == 17)
                             {
-                                if (!x.NeedBits(here.bits + 3))
-                                    goto inf_leave;
-                                x.DropBits(here.bits);
+                                while (bits < here.bits + 3)
+                                {
+                                    if (have == 0)
+                                        goto inf_leave;
+                                    have--;
+                                    hold += (uint)next << (int)bits;
+                                    next = ref Unsafe.Add(ref next, 1);
+                                    bits += 8;
+                                }
+                                hold >>= here.bits;
+                                bits -= here.bits;
                                 len = 0;
-                                copy = 3 + x.Bits(3);
-                                x.DropBits(3);
+                                copy = 3 + (hold & ((1U << (3)) - 1));
+                                hold >>= 3;
+                                bits -= 3;
                             }
                             else
                             {
-                                if (!x.NeedBits(here.bits + 7))
-                                    goto inf_leave;
-                                x.DropBits(here.bits);
+                                while (bits < here.bits + 7)
+                                {
+                                    if (have == 0)
+                                        goto inf_leave;
+                                    have--;
+                                    hold += (uint)next << (int)bits;
+                                    next = ref Unsafe.Add(ref next, 1);
+                                    bits += 8;
+                                }
+                                hold >>= here.bits;
+                                bits -= here.bits;
                                 len = 0;
-                                copy = 11 + x.Bits(7);
-                                x.DropBits(7);
+                                copy = 11 + (hold & ((1U << (7)) - 1));
+                                hold >>= 7;
+                                bits -= 7;
                             }
                             if (state.have + copy > state.nlen + state.ndist)
                             {
@@ -401,8 +498,8 @@ internal static partial class Inflater
                     state.distcode = state.codes;
                     state.diststart = state.next;
                     state.distbits = 6;
-                    codes = ref netUnsafe.Add(ref codes, state.next);
-                    ret = InflateTable(CodeType.Dists, ref netUnsafe.Add(ref lens, state.nlen), state.ndist, ref codes, ref state.distbits, ref work, ref state.next);
+                    codes = ref Unsafe.Add(ref codes, state.next);
+                    ret = InflateTable(CodeType.Dists, ref Unsafe.Add(ref lens, state.nlen), state.ndist, ref codes, ref state.distbits, ref work, ref state.next);
                     if (ret != 0)
                     {
                         strm.msg = "invalid distances set";
@@ -418,11 +515,21 @@ internal static partial class Inflater
                     state.mode = InflateMode.Len;
                     goto case InflateMode.Len;
                 case InflateMode.Len:
-                    if (x.have >= 6 && x.left >= 258)
+                    if (have >= 6 && left >= 258)
                     {
-                        x.Restore();
+                        strm.next_out = (int)Unsafe.ByteOffset(ref MemoryMarshal.GetReference(strm._output.AsSpan()), ref put);
+                        strm.avail_out = left;
+                        strm.next_in = (int)Unsafe.ByteOffset(ref MemoryMarshal.GetReference(strm._input.AsSpan()), ref next);
+                        strm.avail_in = have;
+                        strm.inflateState.hold = hold;
+                        strm.inflateState.bits = bits;
                         InflateFast(strm, @out);
-                        x.Load();
+                        put = ref MemoryMarshal.GetReference(strm._output.AsSpan(strm.next_out));
+                        left = strm.avail_out;
+                        next = ref MemoryMarshal.GetReference(strm._input.AsSpan(strm.next_in));
+                        have = strm.avail_in;
+                        hold = strm.inflateState.hold;
+                        bits = strm.inflateState.bits;
 #pragma warning disable CA1508
                         if (state.mode == InflateMode.Type)
                             state.back = -1;
@@ -430,29 +537,40 @@ internal static partial class Inflater
                         break;
                     }
                     state.back = 0;
+                    lencode = ref MemoryMarshal.GetReference(state.lencode.AsSpan());
                     for (; ; )
                     {
-                        here = state.lencode[x.Bits(state.lenbits)];
-                        if (here.bits <= x.bits)
+                        here = Unsafe.Add(ref lencode, (int)(hold & ((1 << (state.lenbits)) - 1)));
+                        if (here.bits <= bits)
                             break;
-                        if (!x.PullByte())
+                        if (have == 0)
                             goto inf_leave;
+                        have--;
+                        hold += (uint)next << (int)bits;
+                        next = ref Unsafe.Add(ref next, 1);
+                        bits += 8;
                     }
                     if (here.op > 0 && (here.op & 0xf0) == 0)
                     {
                         last = here;
                         for (; ; )
                         {
-                            here = state.lencode[last.val + (x.Bits(last.bits + last.op) >> last.bits)];
-                            if ((uint)(last.bits + here.bits) <= x.bits)
+                            here = Unsafe.Add(ref lencode, last.val + ((int)(hold & (1 << last.bits + last.op - 1)) >> last.bits));
+                            if ((uint)(last.bits + here.bits) <= bits)
                                 break;
-                            if (!x.PullByte())
+                            if (have == 0)
                                 goto inf_leave;
+                            have--;
+                            hold += (uint)next << (int)bits;
+                            next = ref Unsafe.Add(ref next, 1);
+                            bits += 8;
                         }
-                        x.DropBits(last.bits);
+                        hold >>= last.bits;
+                        bits -= last.bits;
                         state.back += last.bits;
                     }
-                    x.DropBits(here.bits);
+                    hold >>= here.bits;
+                    bits -= here.bits;
                     state.back += here.bits;
                     state.length = here.val;
                     if (here.op == 0)
@@ -482,10 +600,18 @@ internal static partial class Inflater
                 case InflateMode.LenExt:
                     if (state.extra != 0)
                     {
-                        if (!x.NeedBits((int)state.extra))
-                            goto inf_leave;
-                        state.length += x.Bits((int)state.extra);
-                        x.DropBits((int)state.extra);
+                        while (bits < state.extra)
+                        {
+                            if (have == 0)
+                                goto inf_leave;
+                            have--;
+                            hold += (uint)next << (int)bits;
+                            next = ref Unsafe.Add(ref next, 1);
+                            bits += 8;
+                        }
+                        state.length += hold & ((1U << ((int)state.extra)) - 1);
+                        hold >>= (int)state.extra;
+                        bits -= state.extra;
                         state.back += (int)state.extra;
                     }
                     Trace.Tracevv($"inflate:         length {state.length}\n");
@@ -493,30 +619,41 @@ internal static partial class Inflater
                     state.mode = InflateMode.Dist;
                     goto case InflateMode.Dist;
                 case InflateMode.Dist:
+                    ref Code distcode = ref MemoryMarshal.GetReference(state.distcode.AsSpan());
                     for (; ; )
                     {
-                        here = state.distcode[state.diststart + x.Bits(state.distbits)];
-                        if (here.bits <= x.bits)
+                        here = Unsafe.Add(ref distcode, state.diststart + (int)(hold & ((1 << (state.distbits)) - 1)));
+                        if (here.bits <= bits)
                             break;
-                        if (!x.PullByte())
+                        if (have == 0)
                             goto inf_leave;
+                        have--;
+                        hold += (uint)next << (int)bits;
+                        next = ref Unsafe.Add(ref next, 1);
+                        bits += 8;
                     }
                     if ((here.op & 0xf0) == 0)
                     {
                         last = here;
                         for (; ; )
                         {
-                            here = state.distcode[state.diststart + last.val +
-                                (x.Bits(last.bits + last.op) >> last.bits)];
-                            if ((uint)(last.bits + here.bits) <= x.bits)
+                            here = Unsafe.Add(ref distcode, (int)(state.diststart + last.val +
+                                ((hold & ((1U << (last.bits + last.op)) - 1)) >> last.bits)));
+                            if ((uint)(last.bits + here.bits) <= bits)
                                 break;
-                            if (!x.PullByte())
+                            if (have == 0)
                                 goto inf_leave;
+                            have--;
+                            hold += (uint)next << (int)bits;
+                            next = ref Unsafe.Add(ref next, 1);
+                            bits += 8;
                         }
-                        x.DropBits(last.bits);
+                        hold >>= last.bits;
+                        bits -= last.bits;
                         state.back += last.bits;
                     }
-                    x.DropBits(here.bits);
+                    hold >>= here.bits;
+                    bits -= here.bits;
                     state.back += here.bits;
                     if ((here.op & 64) != 0)
                     {
@@ -531,19 +668,27 @@ internal static partial class Inflater
                 case InflateMode.DistExt:
                     if (state.extra != 0)
                     {
-                        if (!x.NeedBits((int)state.extra))
-                            goto inf_leave;
-                        state.offset += x.Bits((int)state.extra);
-                        x.DropBits((int)state.extra);
+                        while (bits < state.extra)
+                        {
+                            if (have == 0)
+                                goto inf_leave;
+                            have--;
+                            hold += (uint)next << (int)bits;
+                            next = ref Unsafe.Add(ref next, 1);
+                            bits += 8;
+                        }
+                        state.offset += hold & ((1U << ((int)state.extra)) - 1);
+                        hold >>= (int)state.extra;
+                        bits -= state.extra;
                         state.back += (int)state.extra;
                     }
                     Trace.Tracevv($"inflate:         distance {state.offset}\n");
                     state.mode = InflateMode.Match;
                     goto case InflateMode.Match;
                 case InflateMode.Match:
-                    if (x.left == 0)
+                    if (left == 0)
                         goto inf_leave;
-                    copy = @out - x.left;
+                    copy = @out - left;
                     if (state.offset > copy) // copy from window
                     {
                         copy = state.offset - copy;
@@ -556,54 +701,65 @@ internal static partial class Inflater
                         if (copy > state.wnext)
                         {
                             copy -= state.wnext;
-                            from = (byte*)netUnsafe.AsPointer(ref window) + (state.wsize - copy);
+                            from = ref Unsafe.Add(ref window, (int)(state.wsize - copy));
                         }
                         else
-                            from = (byte*)netUnsafe.AsPointer(ref window) + (state.wnext - copy);
+                            from = ref Unsafe.Add(ref window, (int)(state.wnext - copy));
                         if (copy > state.length)
                             copy = state.length;
                     }
                     else // copy from output
                     {
-                        from = x.put - state.offset;
+                        from = ref Unsafe.Subtract(ref put, (int)state.offset);
                         copy = state.length;
                     }
-                    if (copy > x.left)
-                        copy = x.left;
-                    x.left -= copy;
+                    if (copy > left)
+                        copy = left;
+                    left -= copy;
                     state.length -= copy;
                     do
                     {
-                        *x.put++ = *from++;
+                        put = from;
+                        put = ref Unsafe.Add(ref put, 1);
+                        from = ref Unsafe.Add(ref from, 1);
                     } while (--copy != 0);
                     if (state.length == 0)
                         state.mode = InflateMode.Len;
                     break;
                 case InflateMode.Lit:
-                    if (x.left == 0)
+                    if (left == 0)
                         goto inf_leave;
-                    *x.put++ = (byte)state.length;
-                    x.left--;
+                    put = (byte)state.length;
+                    put = ref Unsafe.Add(ref put, 1);
+                    left--;
                     state.mode = InflateMode.Len;
                     break;
                 case InflateMode.Check:
                     if (state.wrap != 0)
                     {
-                        if (!x.NeedBits(32))
-                            goto inf_leave;
-                        @out -= x.left;
+                        while (bits < 32)
+                        {
+                            if (have == 0)
+                                goto inf_leave;
+                            have--;
+                            hold += (uint)next << (int)bits;
+                            next = ref Unsafe.Add(ref next, 1);
+                            bits += 8;
+                        }
+                        @out -= left;
                         strm.total_out += @out;
                         state.total += @out;
                         if ((state.wrap & 4) != 0 && @out != 0)
-                            strm.Adler = state.check = Adler32.Update(state.check, ref netUnsafe.AsRef<byte>(x.put - @out), @out);
-                        @out = x.left;
-                        if ((state.wrap & 4) != 0 && ZSwap32(x.hold) != state.check)
+                            strm.Adler = state.check = Adler32.Update(state.check, ref Unsafe.Subtract(ref put, (int)@out), @out);
+                        @out = left;
+                        if ((state.wrap & 4) != 0 && ZSwap32(hold) != state.check)
                         {
                             strm.msg = "incorrect data check";
                             state.mode = InflateMode.Bad;
                             break;
                         }
-                        x.InitBits();
+                        hold = 0;
+                        bits = 0;
                         Trace.Tracev("inflate:   check matches trailer\n");
                     }
                     state.mode = InflateMode.Done;
@@ -622,13 +778,18 @@ internal static partial class Inflater
             }
 
         inf_leave:
-        x.Restore();
+        strm.next_out = (int)Unsafe.ByteOffset(ref MemoryMarshal.GetReference(strm._output.AsSpan()), ref put);
+        strm.avail_out = left;
+        strm.next_in = (int)Unsafe.ByteOffset(ref MemoryMarshal.GetReference(strm._input.AsSpan()), ref next);
+        strm.avail_in = have;
+        strm.inflateState.hold = hold;
+        strm.inflateState.bits = bits;
         if (state.wsize != 0 || @out != strm.avail_out && state.mode < InflateMode.Bad &&
             (state.mode < InflateMode.Check || flush != Z_FINISH))
         {
             try
             {
-                UpdateWindow(strm, ref netUnsafe.AsRef<byte>(x.put), @out - strm.avail_out);
+                UpdateWindow(strm, ref put, @out - strm.avail_out);
             }
             catch (OutOfMemoryException)
             {
@@ -642,7 +803,7 @@ internal static partial class Inflater
         strm.total_out += @out;
         state.total += @out;
         if ((state.wrap & 4) != 0 && @out != 0)
-            strm.Adler = state.check = Adler32.Update(state.check, ref netUnsafe.AsRef<byte>(x.put - @out), @out);
+            strm.Adler = state.check = Adler32.Update(state.check, ref Unsafe.Subtract(ref put, (int)@out), @out);
         strm.data_type = (int)state.bits + (state.last != 0 ? 64 : 0) +
             (state.mode == InflateMode.Type ? 128 : 0) +
             (state.mode == InflateMode.Len_ || state.mode == InflateMode.Copy_ ? 256 : 0);
@@ -652,97 +813,11 @@ internal static partial class Inflater
         return ret;
     }
 
-    private static bool InflateStateCheck(Unsafe.ZStream strm) =>
+    private static bool InflateStateCheck(ZStream strm) =>
         strm == null || strm.inflateState == null || strm.inflateState.strm != strm
             || strm.inflateState.mode < InflateMode.Head || strm.inflateState.mode > InflateMode.Sync;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static uint ZSwap32(uint q) => (((q) >> 24) & 0xff) + (((q) >> 8) & 0xff00)
         + (((q) & 0xff00) << 8) + (((q) & 0xff) << 24);
-
-    private unsafe struct LocalState
-    {
-        internal readonly Unsafe.ZStream strm;
-        internal byte* next; // next input
-        internal byte* put; // next output
-        internal uint have, left; // available input and output
-        internal uint hold; // bit buffer
-        internal uint bits; // bits in bit buffer
-
-        internal LocalState(Unsafe.ZStream strm)
-        {
-            this.strm = strm;
-            next = default;
-            put = default;
-            have = left = default;
-            hold = default;
-            bits = default;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void Load()
-        {
-            put = strm.next_out;
-            left = strm.avail_out;
-            next = strm.next_in;
-            have = strm.avail_in;
-            hold = strm.inflateState.hold;
-            bits = strm.inflateState.bits;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool NeedBits(int n)
-        {
-            while (bits < n)
-                if (!PullByte())
-                    return false;
-            return true;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool PullByte()
-        {
-            if (have == 0)
-                return false;
-            have--;
-            hold += (uint)*next++ << (int)bits;
-            bits += 8;
-            return true;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal uint Bits(int n) => hold & ((1U << (n)) - 1);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void InitBits()
-        {
-            hold = 0;
-            bits = 0;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void ByteBits()
-        {
-            hold >>= (int)(bits & 7);
-            bits -= bits & 7;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void DropBits(int n)
-        {
-            hold >>= n;
-            bits -= (uint)n;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void Restore()
-        {
-            strm.next_out = put;
-            strm.avail_out = left;
-            strm.next_in = next;
-            strm.avail_in = have;
-            strm.inflateState.hold = hold;
-            strm.inflateState.bits = bits;
-        }
-    }
 }

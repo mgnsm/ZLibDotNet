@@ -1,6 +1,8 @@
 ﻿// Copyright (C) 2022 Magnus Montin
 
 using System;
+using ZLibDotNet.Deflate;
+using ZLibDotNet.Inflate;
 
 namespace ZLibDotNet;
 
@@ -11,11 +13,22 @@ namespace ZLibDotNet;
 public sealed class ZStream
 #pragma warning restore CA1711
 {
-    internal readonly Unsafe.ZStream strm = new();
-    internal int inputOffset;   // the index of next input byte in the input buffer
-    internal int outputOffset;  // the index of next output byte in the output buffer
-    private byte[] _input;
-    private byte[] _output;
+    internal int next_in;       // the index of next input byte in the input buffer
+    internal uint avail_in;     // number of bytes available at next_in
+    internal uint total_in;     // total number of input bytes read so far
+
+    internal int next_out;      // the index of next output byte in the output buffer
+    internal uint avail_out;    // remaining free space at next_out
+    internal uint total_out;    // total number of bytes output so far
+
+    internal string msg;        // last error message
+    internal InflateState inflateState;
+    internal DeflateState deflateState;
+
+    internal int data_type;     // best guess about the data type: binary or text for deflate, or the decoding state for inflate
+
+    internal byte[] _input;
+    internal byte[] _output;
 
     /// <summary>
     /// Gets or sets the input buffer.
@@ -29,7 +42,7 @@ public sealed class ZStream
         set
         {
             _input = value;
-            inputOffset = default;
+            next_in = default;
             AvailableIn = value?.Length ?? default;
         }
     }
@@ -42,11 +55,11 @@ public sealed class ZStream
     /// <remarks>If you choose to set this optional property, you should set it after you have set the <see cref="Input"/> property.</remarks>
     public int AvailableIn
     {
-        get => (int)strm.AvailableIn;
+        get => (int)avail_in;
         set
         {
-            ValidateAvailableBytes(value, inputOffset, _input, nameof(Input), nameof(NextIn));
-            strm.AvailableIn = (uint)value;
+            ValidateAvailableBytes(value, next_in, _input, nameof(Input), nameof(NextIn));
+            avail_in = (uint)value;
         }
     }
 
@@ -59,18 +72,18 @@ public sealed class ZStream
     /// <remarks>If you choose to set this optional property, you should set it after you have set the <see cref="Input"/> property.</remarks>
     public int NextIn
     {
-        get => inputOffset;
+        get => next_in;
         set
         {
             ValidateOffset(value, AvailableIn, _input, nameof(Input));
-            inputOffset = value;
+            next_in = value;
         }
     }
 
     /// <summary>
     /// Gets the total number of input bytes read so far.
     /// </summary>
-    public int TotalIn => (int)strm.TotalIn;
+    public int TotalIn => (int)total_in;
 
     /// <summary>
     /// Gets or sets the output buffer.
@@ -84,7 +97,7 @@ public sealed class ZStream
         set
         {
             _output = value;
-            outputOffset = default;
+            next_out = default;
             AvailableOut = value?.Length ?? default;
         }
     }
@@ -97,11 +110,11 @@ public sealed class ZStream
     /// <remarks>If you choose to set this optional property, you should set it after you have set the <see cref="Output"/> property.</remarks>
     public int AvailableOut
     {
-        get => (int)strm.AvailableOut;
+        get => (int)avail_out;
         set
         {
-            ValidateAvailableBytes(value, outputOffset, _output, nameof(Output), nameof(NextOut));
-            strm.AvailableOut = (uint)value;
+            ValidateAvailableBytes(value, next_out, _output, nameof(Output), nameof(NextOut));
+            avail_out = (uint)value;
         }
     }
 
@@ -114,33 +127,33 @@ public sealed class ZStream
     /// <remarks>If you choose to set this optional property, you should set it after you have set the <see cref="Output"/> property.</remarks>
     public int NextOut
     {
-        get => outputOffset;
+        get => next_out;
         set
         {
             ValidateOffset(value, AvailableOut, _output, nameof(Output));
-            outputOffset = value;
+            next_out = value;
         }
     }
 
     /// <summary>
     /// Gets the total number of bytes output so far.
     /// </summary>
-    public int TotalOut => (int)strm.TotalOut;
+    public int TotalOut => (int)total_out;
 
     /// <summary>
     /// Gets the last error message, or <see langword="null"/> if no error.
     /// </summary>
-    public string Message => strm.Message;
+    public string Message => msg;
 
     /// <summary>
     /// Gets a value that represents a best guess about the data type: binary or text for deflate, or the decoding state for inflate.
     /// </summary>
-    public int DataType => strm.data_type;
+    public int DataType => data_type;
 
     /// <summary>
     /// Gets the Adler-32 value of the uncompressed data.
     /// </summary>
-    public uint Adler => strm.Adler;
+    public uint Adler { get; internal set; }
 
     private static void ValidateAvailableBytes(int value, int offset, byte[] buffer, string bufferName, string offsetPropertyName)
     {

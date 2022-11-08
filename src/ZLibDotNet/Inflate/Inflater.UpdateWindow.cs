@@ -3,13 +3,14 @@
 
 using System;
 using System.Buffers;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace ZLibDotNet.Inflate;
 
 internal static partial class Inflater
 {
-    private static void UpdateWindow(Unsafe.ZStream strm, ref byte end, uint copy)
+    private static void UpdateWindow(ZStream strm, ref byte end, uint copy)
     {
         InflateState state = strm.inflateState;
 
@@ -29,7 +30,7 @@ internal static partial class Inflater
         // copy state.wsize or less output bytes into the circular window
         if (copy >= state.wsize)
         {
-            netUnsafe.CopyBlockUnaligned(ref window, ref netUnsafe.Subtract(ref end, (int)state.wsize), state.wsize);
+            Unsafe.CopyBlockUnaligned(ref window, ref Unsafe.Subtract(ref end, (int)state.wsize), state.wsize);
             state.wnext = 0;
             state.whave = state.wsize;
         }
@@ -38,11 +39,11 @@ internal static partial class Inflater
             dist = state.wsize - state.wnext;
             if (dist > copy)
                 dist = copy;
-            netUnsafe.CopyBlockUnaligned(ref netUnsafe.Add(ref window, (int)state.wnext), ref netUnsafe.Subtract(ref end, (int)copy), dist);
+            Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref window, (int)state.wnext), ref Unsafe.Subtract(ref end, (int)copy), dist);
             copy -= dist;
             if (copy != 0)
             {
-                netUnsafe.CopyBlockUnaligned(ref window, ref netUnsafe.Subtract(ref end, (int)copy), copy);
+                Unsafe.CopyBlockUnaligned(ref window, ref Unsafe.Subtract(ref end, (int)copy), copy);
                 state.wnext = copy;
                 state.whave = state.wsize;
             }

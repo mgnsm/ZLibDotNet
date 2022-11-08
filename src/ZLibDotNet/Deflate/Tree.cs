@@ -259,11 +259,11 @@ internal static class Tree
         }
         else
         {
-            Debug.Assert(!netUnsafe.IsNullRef(ref buf), "lost buf");
+            Debug.Assert(!Unsafe.IsNullRef(ref buf), "lost buf");
             opt_lenb = static_lenb = stored_len + 5; /* force a stored block */
         }
 
-        if (stored_len + 4 <= opt_lenb && !netUnsafe.IsNullRef(ref buf))
+        if (stored_len + 4 <= opt_lenb && !Unsafe.IsNullRef(ref buf))
         {
             // 4: two words for the lengths
 
@@ -319,8 +319,8 @@ internal static class Tree
         Windup(s); // align on byte boundary
         PutShort(s, (ushort)stored_len);
         PutShort(s, (ushort)~stored_len);
-        if (!netUnsafe.IsNullRef(ref buf) && stored_len != 0)
-            netUnsafe.CopyBlockUnaligned(ref MemoryMarshal.GetReference(s.pending_buf.AsSpan((int)s.pending)), ref buf, stored_len);
+        if (!Unsafe.IsNullRef(ref buf) && stored_len != 0)
+            Unsafe.CopyBlockUnaligned(ref MemoryMarshal.GetReference(s.pending_buf.AsSpan((int)s.pending)), ref buf, stored_len);
         s.pending += stored_len;
 #if DEBUG
         s.compressed_len = (s.compressed_len + 3 + 7) & unchecked((uint)~7);
@@ -341,13 +341,13 @@ internal static class Tree
         ref TreeNode bl_tree = ref MemoryMarshal.GetReference(s.bl_tree.AsSpan());
         int n;
         for (n = 0; n < LCodes; n++)
-            netUnsafe.Add(ref dyn_ltree, n).fc = 0;
+            Unsafe.Add(ref dyn_ltree, n).fc = 0;
         for (n = 0; n < DCodes; n++)
-            netUnsafe.Add(ref dyn_dtree, n).fc = 0;
+            Unsafe.Add(ref dyn_dtree, n).fc = 0;
         for (n = 0; n < BlCodes; n++)
-            netUnsafe.Add(ref bl_tree, n).fc = 0;
+            Unsafe.Add(ref bl_tree, n).fc = 0;
 
-        netUnsafe.Add(ref dyn_ltree, EndBlock).fc = 1;
+        Unsafe.Add(ref dyn_ltree, EndBlock).fc = 1;
 
         s.opt_len = s.static_len = 0;
         s.sym_next = s.matches = 0;
@@ -830,7 +830,7 @@ internal static class Tree
     /// <param name="dist">The distance of matched string.</param>
     /// <param name="lc">The match length - MIN_MATCH or unmatched char (if dist==0).</param>
     /// <returns><see langword="true"/> if the current block must be flushed.</returns>
-    internal static bool Tally(DeflateState s, uint dist, uint lc)
+    internal static bool Tally(DeflateState s, uint dist, int lc)
     {
         s.pending_buf[s.lit_bufsize + s.sym_next++] = (byte)dist;
         s.pending_buf[s.lit_bufsize + s.sym_next++] = (byte)(dist >> 8);

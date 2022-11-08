@@ -4,7 +4,7 @@
 namespace ZLibDotNet.Inflate;
 
 /// <summary>
-/// Possible inflate modes between <see cref="Inflater.Inflate(Unsafe.ZStream, int)"/> calls.
+/// Possible inflate modes between <see cref="Inflater.Inflate(ZStream, int)"/> calls.
 /// </summary>
 internal enum InflateMode : ushort
 {
