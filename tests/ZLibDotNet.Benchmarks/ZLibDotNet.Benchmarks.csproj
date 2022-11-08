@@ -13,9 +13,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BenchmarkDotNet" Version="0.13.1" />
+    <PackageReference Include="BenchmarkDotNet" Version="0.13.2" />
     <PackageReference Include="DotNetZip" Version="1.16.0" />
-    <PackageReference Include="SharpZipLib" Version="1.3.3" />
+    <PackageReference Include="SharpZipLib" Version="1.4.1" />
     <PackageReference Include="zlib.managed" Version="1.1.5-preview-99682104" />
   </ItemGroup>
 
