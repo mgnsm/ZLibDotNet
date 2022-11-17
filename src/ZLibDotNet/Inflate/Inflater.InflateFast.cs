@@ -11,16 +11,10 @@ internal static partial class Inflater
 {
     private static void InflateFast(ZStream strm, uint start)
     {
-        InflateState state = strm.inflateState; // have enough input while in < last
-        ref byte @in = ref MemoryMarshal.GetReference(strm._input.AsSpan(strm.next_in));
-        ref byte last = ref Unsafe.Add(ref @in, (int)(strm.avail_in - 5));
-        ref byte @out = ref MemoryMarshal.GetReference(strm._output.AsSpan(strm.next_out));
-        ref byte beg = ref Unsafe.Subtract(ref @out, (int)(start - strm.avail_out)); // inflate()'s initial strm.next_out
-        ref byte end = ref Unsafe.Add(ref @out, (int)(strm.avail_out - 257)); // while out < end, enough space available
-        ref Code lcode = ref MemoryMarshal.GetReference(state.lencode.AsSpan());
-        ref Code dcode = ref MemoryMarshal.GetReference(state.distcode.AsSpan(state.diststart));
-        ref byte from = ref Unsafe.NullRef<byte>(); // where to copy match from
-        ref byte window = ref MemoryMarshal.GetReference(state.window.AsSpan());
+        InflateState state = strm.inflateState;
+        int last = strm.next_in + ((int)strm.avail_in - 5); // have enough input while in < last
+        int beg = strm.next_out - (int)(start - strm.avail_out); // inflate()'s initial strm.next_out
+        int end = strm.next_out + ((int)strm.avail_out - 257); // while out < end, enough space available
         uint wsize = state.wsize;
         uint whave = state.whave;
         uint wnext = state.wnext;
@@ -31,6 +25,14 @@ internal static partial class Inflater
         uint op;    // code bits, operation, extra bits, or window position, window bytes to copy
         uint len;   // match length, unused bytes
         uint dist;  // match distance
+
+        ref byte @in = ref MemoryMarshal.GetReference(strm._input.AsSpan(strm.next_in));
+        ref byte @out = ref MemoryMarshal.GetReference(strm._output.AsSpan(strm.next_out));
+        ref byte window = ref MemoryMarshal.GetReference(state.window.AsSpan());
+        ref Code lcode = ref MemoryMarshal.GetReference(state.lencode.AsSpan());
+        ref Code dcode = ref MemoryMarshal.GetReference(state.distcode.AsSpan(state.diststart));
+        ref byte from = ref Unsafe.NullRef<byte>(); // where to copy match from
+        ref Code here = ref Unsafe.NullRef<Code>(); // retrieved table entry
 
         // decode literals and length/distances until end-of-block or not enough  input data or output space            
         do
@@ -45,7 +47,7 @@ internal static partial class Inflater
                 bits += 8;
                 strm.next_in += 2;
             }
-            ref Code here = ref Unsafe.Add(ref lcode, (int)(hold & lmask));
+            here = ref Unsafe.Add(ref lcode, (int)(hold & lmask));
         dolen:
             op = here.bits;
             hold >>= (int)op;
@@ -116,7 +118,7 @@ internal static partial class Inflater
                     hold >>= (int)op;
                     bits -= op;
                     Trace.Tracevv($"inflate:         distance {dist}\n");
-                    op = (uint)Unsafe.ByteOffset(ref beg, ref @out); // max distance in output
+                    op = (uint)(strm.next_out - beg); // max distance in output
                     if (dist > op)
                     {
                         op = dist - op; // distance back in window
@@ -288,7 +290,7 @@ internal static partial class Inflater
                 state.mode = InflateMode.Bad;
                 break;
             }
-        } while (Unsafe.IsAddressLessThan(ref @in, ref last) && Unsafe.IsAddressLessThan(ref @out, ref end));
+        } while (strm.next_in < last && strm.next_out < end);
 
         // return unused bytes (on entry, bits < 8, so in won't go too far back)
         len = bits >> 3;
@@ -298,10 +300,8 @@ internal static partial class Inflater
         hold &= (1U << (int)bits) - 1;
 
         // update state and return
-        strm.avail_in = (uint)(Unsafe.IsAddressLessThan(ref @in, ref last) ?
-            5 + (int)Unsafe.ByteOffset(ref @in, ref last) : 5 - (int)Unsafe.ByteOffset(ref last, ref @in));
-        strm.avail_out = (uint)(Unsafe.IsAddressLessThan(ref @out, ref end) ?
-            257 + (int)Unsafe.ByteOffset(ref @out, ref end) : 257 - (int)Unsafe.ByteOffset(ref end, ref @out));
+        strm.avail_in = (uint)(strm.next_in < last ? 5 + (last - strm.next_in) : 5 - (strm.next_in - last));
+        strm.avail_out = (uint)(strm.next_out < end ? 257 + (end - strm.next_out) : 257 - (strm.next_out - end));
 
         state.hold = hold;
         state.bits = bits;
