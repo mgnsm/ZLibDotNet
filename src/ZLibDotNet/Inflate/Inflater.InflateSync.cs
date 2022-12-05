@@ -66,9 +66,9 @@ internal static partial class Inflater
         return Z_OK;
     }
 
-    private static uint SyncSearch(ref uint have, ref byte buf, int len)
+    private static uint SyncSearch(ref int have, ref byte buf, int len)
     {
-        uint got = have;
+        int got = have;
         int next = 0;
         while (next < len && got < 4)
         {

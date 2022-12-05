@@ -2,6 +2,7 @@
 // Managed C#/.NET code Copyright (C) 2022 Magnus Montin
 
 using System;
+using System.Runtime.InteropServices;
 
 namespace ZLibDotNet.Deflate;
 
@@ -34,7 +35,7 @@ internal static partial class Deflater
             if (s.level == 0 && s.matches != 0)
             {
                 if (s.matches == 1)
-                    SlideHash(s);
+                    SlideHash(s, ref MemoryMarshal.GetReference(s.head.AsSpan()));
                 else
                     Array.Clear(s.head, 0, s.head.Length);
                 s.matches = 0;

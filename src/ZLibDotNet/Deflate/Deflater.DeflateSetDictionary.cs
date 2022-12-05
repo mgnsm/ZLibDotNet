@@ -50,7 +50,9 @@ internal static partial class Deflater
 
         int str, n;
         ref byte window = ref MemoryMarshal.GetReference(s.window.AsSpan());
-        FillWindow(s, ref window);
+        ref ushort prev = ref MemoryMarshal.GetReference(s.prev.AsSpan());
+        ref ushort head = ref MemoryMarshal.GetReference(s.head.AsSpan());
+        FillWindow(s, ref window, ref prev, ref head);
         while (s.lookahead >= MinMatch)
         {
             str = s.strstart;
@@ -58,13 +60,14 @@ internal static partial class Deflater
             do
             {
                 UpdateHash(s, ref s.ins_h, Unsafe.Add(ref window, str + MinMatch - 1));
-                s.prev[str & s.w_mask] = s.head[s.ins_h];
-                s.head[s.ins_h] = (ushort)str;
+                ref ushort temp = ref Unsafe.Add(ref head, s.ins_h);
+                Unsafe.Add(ref prev, str & s.w_mask) = temp;
+                temp = (ushort)str;
                 str++;
             } while (--n != 0);
             s.strstart = str;
             s.lookahead = MinMatch - 1;
-            FillWindow(s, ref window);
+            FillWindow(s, ref window, ref prev, ref head);
         }
         s.strstart += s.lookahead;
         s.block_start = s.strstart;

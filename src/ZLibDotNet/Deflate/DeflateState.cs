@@ -21,7 +21,7 @@ internal class DeflateState
 
     internal byte[] pending_out;    // next pending byte to output to the stream
 
-    internal uint pending;          // nb of bytes in the pending buffer
+    internal int pending;           // nb of bytes in the pending buffer
 
     internal byte method;           // can only be DEFLATED
     internal int last_flush;        // value of flush param for previous deflate call
@@ -105,7 +105,7 @@ internal class DeflateState
 
     internal ushort[] bl_count = new ushort[MaxBits + 1]; // number of codes at each bit length for an optimal tree
 
-    internal int[] heap = new int[2 * LCodes + 1]; // heap used to build the Huffman trees
+    internal int[] heap = new int[2 * LCodes + 1];  // heap used to build the Huffman trees
     internal int heap_len;                          // number of elements in the heap
     internal int heap_max;                          // element of largest frequency
 
@@ -131,12 +131,12 @@ internal class DeflateState
      *   - I can't count above 4
      */
 
-    internal uint sym_next;         // running index in sym_buf
+    internal int sym_next;          // running index in sym_buf
     internal int sym_end;           // symbol table full when sym_next reaches this
 
     internal uint opt_len;          // bit length of current block with optimal trees
     internal uint static_len;       // bit length of current block with static trees
-    internal uint matches;          // number of string matches in current block
+    internal int matches;           // number of string matches in current block
     internal int insert;            // bytes at end of window left to insert
 
 #if DEBUG

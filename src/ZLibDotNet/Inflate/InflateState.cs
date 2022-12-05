@@ -36,7 +36,7 @@ internal class InflateState
     internal uint ncode;            // number of code length code lengths
     internal int nlen;              // number of length code lengths
     internal int ndist;             // number of distance code lengths
-    internal uint have;             // number of code lengths in lens[]
+    internal int have;              // number of code lengths in lens[]
     internal int next;              // next available space in codes[]
     internal int diststart;         // starting index in codes[] for distance codes
     internal readonly ushort[] lens = new ushort[320]; // temporary storage for code lengths

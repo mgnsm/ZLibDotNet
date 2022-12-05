@@ -119,6 +119,7 @@ internal static partial class Inflater
         ref ushort work = ref MemoryMarshal.GetReference(state.work.AsSpan());
         ref byte window = ref MemoryMarshal.GetReference(state.window.AsSpan());
         ref Code lencode = ref Unsafe.NullRef<Code>();
+        ref ushort order = ref MemoryMarshal.GetReference(s_order.AsSpan());
         uint have = strm.avail_in;          // available input
         uint left = strm.avail_out;         // ...and output
         uint hold = strm.inflateState.hold; // bit buffer
@@ -367,12 +368,12 @@ internal static partial class Inflater
                             next_in++;
                             bits += 8;
                         }
-                        Unsafe.Add(ref lens, s_order[state.have++]) = (ushort)(hold & ((1U << (3)) - 1));
+                        Unsafe.Add(ref lens, Unsafe.Add(ref order, state.have++)) = (ushort)(hold & ((1U << (3)) - 1));
                         hold >>= 3;
                         bits -= 3;
                     }
                     while (state.have < 19)
-                        Unsafe.Add(ref lens, s_order[state.have++]) = 0;
+                        Unsafe.Add(ref lens, Unsafe.Add(ref order, state.have++)) = 0;
                     state.next = 0;
                     state.lencode = state.codes;
                     state.lenbits = 7;
@@ -408,7 +409,7 @@ internal static partial class Inflater
                         {
                             hold >>= here.bits;
                             bits -= here.bits;
-                            Unsafe.Add(ref lens, (int)state.have++) = here.val;
+                            Unsafe.Add(ref lens, state.have++) = here.val;
                         }
                         else
                         {
@@ -432,7 +433,7 @@ internal static partial class Inflater
                                     state.mode = InflateMode.Bad;
                                     break;
                                 }
-                                len = Unsafe.Add(ref lens, (int)(state.have - 1));
+                                len = Unsafe.Add(ref lens, state.have - 1);
                                 copy = 3 + (hold & ((1U << (2)) - 1));
                                 hold >>= 2;
                                 bits -= 2;
@@ -482,7 +483,7 @@ internal static partial class Inflater
                                 break;
                             }
                             while (copy-- != 0)
-                                Unsafe.Add(ref lens, (int)state.have++) = (ushort)len;
+                                Unsafe.Add(ref lens, state.have++) = (ushort)len;
                         }
                     }
 
