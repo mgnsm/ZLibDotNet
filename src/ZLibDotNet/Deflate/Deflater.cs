@@ -1188,7 +1188,7 @@ internal static partial class Deflater
             Debug.Assert(scan == match, "match[2]?");
 
             /* We check for insufficient lookahead only every 8th comparison;
-             * the 256th check will be made at strstart+258.
+             * the 256th check will be made at strstart + 258.
              */
             do
             {

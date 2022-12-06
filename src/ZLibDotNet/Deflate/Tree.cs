@@ -200,7 +200,7 @@ internal static class Tree
 
             Trace.Tracev($"\nopt {opt_lenb}({s.opt_len}) stat {static_lenb}({s.static_len}) stored {stored_len} lit {s.sym_next / 3} ");
 
-            if (static_lenb <= opt_lenb)
+            if (static_lenb <= opt_lenb || s.strategy == Z_FIXED)
                 opt_lenb = static_lenb;
         }
         else
@@ -221,7 +221,7 @@ internal static class Tree
              */
             StoredBlock(s, ref buf, stored_len, last, ref pending_buf);
         }
-        else if (s.strategy == Z_FIXED || static_lenb == opt_lenb)
+        else if (static_lenb == opt_lenb)
         {
             SendBits(s, (StaticTrees << 1) + last, 3, ref pending_buf);
             CompressBlock(s, ref MemoryMarshal.GetReference(s_ltree.AsSpan()),
@@ -832,7 +832,7 @@ internal static class Tree
                 {
                     // Here, lc is the match length - MIN_MATCH
                     int code = Unsafe.Add(ref length_code, lc); // the code to send
-                    SendCode(s, ref Unsafe.Add(ref ltree, code + Literals + 1), ref pending_buf); // send the length code
+                    SendCode(s, ref Unsafe.Add(ref ltree, code + Literals + 1), ref pending_buf); // send length code
                     int extra = Unsafe.Add(ref extra_lbits, code); // number of extra bits to send
                     if (extra != 0)
                     {

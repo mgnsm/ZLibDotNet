@@ -29,6 +29,8 @@ internal static partial class Inflater
         // extract wrap request from windowBits parameter
         if (windowBits < 0)
         {
+            if (windowBits < -15)
+                return Z_STREAM_ERROR;
             wrap = 0;
             windowBits = -windowBits;
         }

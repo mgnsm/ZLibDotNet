@@ -31,6 +31,8 @@ internal static partial class Deflater
         if (windowBits < 0) // suppress zlib wrapper
         {
             wrap = 0;
+            if (windowBits < -15)
+                return Z_STREAM_ERROR;
             windowBits = -windowBits;
         }
 
