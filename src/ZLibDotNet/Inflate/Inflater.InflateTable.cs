@@ -115,8 +115,6 @@ internal static partial class Inflater
             switch (type)
             {
                 case CodeType.Codes:
-                    @base = ref work; // dummy value--not used
-                    extra = ref work; // dummy value--not used
                     match = 20;
                     break;
                 case CodeType.Lens:
