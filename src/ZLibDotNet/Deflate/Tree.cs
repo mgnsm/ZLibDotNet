@@ -12,11 +12,11 @@ namespace ZLibDotNet.Deflate;
 internal static class Tree
 {
     private const byte MaxBlBits = 7;       // Bit length codes must not exceed MAX_BL_BITS bits
-    private const ushort EndBlock = 256;    // end of block literal code
-    private const byte Rep_3_6 = 16;        // repeat previous bit length 3-6 times (2 bits of repeat count)
-    private const byte RepZ_3_10 = 17;      // repeat a zero length 3-10 times  (3 bits of repeat count)
-    private const byte RepZ_11_138 = 18;    // repeat a zero length 11-138 times  (7 bits of repeat count)
-    private const byte Smallest = 1;        // Index within the heap array of least frequent node in the Huffman tree
+    private const uint EndBlock = 256;      // end of block literal code
+    private const uint Rep_3_6 = 16;        // repeat previous bit length 3-6 times (2 bits of repeat count)
+    private const uint RepZ_3_10 = 17;      // repeat a zero length 3-10 times  (3 bits of repeat count)
+    private const uint RepZ_11_138 = 18;    // repeat a zero length 11-138 times  (7 bits of repeat count)
+    private const uint Smallest = 1;        // Index within the heap array of least frequent node in the Huffman tree
     private const byte StaticTrees = 1;
     private const byte DynTrees = 2;
 
@@ -163,13 +163,13 @@ internal static class Tree
     /// <summary>
     /// Determines the best encoding for the current block: dynamic trees, static trees or store, and writes out the encoded block.
     /// </summary>
-    internal static void FlushBlock(DeflateState s, ref byte buf, int stored_len, int last,
+    internal static void FlushBlock(DeflateState s, ref byte buf, uint stored_len, uint last,
         ref byte pending_buf, ref TreeNode dyn_ltree, ref TreeNode dyn_dtree, ref TreeNode bl_tree,
         ref ushort bl_count, ref int heap, ref byte depth, ref ushort bl_order, ref byte dist_code,
         ref byte length_code, ref int base_dist, ref int base_length, ref int extra_dbits, ref int extra_lbits)
     {
         uint opt_lenb, static_lenb; // opt_len and static_len in bytes
-        int max_blindex = 0;  // index of last bit length code of non zero freq */
+        uint max_blindex = 0;  // index of last bit length code of non zero freq */
 
         // Build the Huffman trees unless a stored block is forced
         if (s.level > 0)
@@ -206,7 +206,7 @@ internal static class Tree
         else
         {
             Debug.Assert(!Unsafe.IsNullRef(ref buf), "lost buf");
-            opt_lenb = static_lenb = (uint)stored_len + 5; // force a stored block
+            opt_lenb = static_lenb = stored_len + 5; // force a stored block
         }
 
         if (stored_len + 4 <= opt_lenb && !Unsafe.IsNullRef(ref buf))
@@ -234,7 +234,7 @@ internal static class Tree
         else
         {
             SendBits(s, (DynTrees << 1) + last, 3, ref pending_buf);
-            SendAllTrees(s, s.l_desc.max_code + 1, s.d_desc.max_code + 1, max_blindex + 1,
+            SendAllTrees(s, (uint)(s.l_desc.max_code + 1), (uint)(s.d_desc.max_code + 1), max_blindex + 1,
                 ref pending_buf, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_order);
             CompressBlock(s, ref dyn_ltree, ref dyn_dtree, ref pending_buf, ref dist_code, ref length_code,
                 ref base_dist, ref base_length, ref extra_dbits, ref extra_lbits);
@@ -262,7 +262,7 @@ internal static class Tree
     /// <summary>
     /// Sends a stored block.
     /// </summary>
-    internal static void StoredBlock(DeflateState s, ref byte buf, int stored_len, int last, ref byte pending_buf)
+    internal static void StoredBlock(DeflateState s, ref byte buf, uint stored_len, uint last, ref byte pending_buf)
     {
         const int STORED_BLOCK = 0;
         SendBits(s, (STORED_BLOCK << 1) + last, 3, ref pending_buf); // send block type
@@ -270,13 +270,13 @@ internal static class Tree
         PutShort(s, (ushort)stored_len, ref pending_buf);
         PutShort(s, (ushort)~stored_len, ref pending_buf);
         if (!Unsafe.IsNullRef(ref buf) && stored_len != 0)
-            Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref pending_buf, s.pending), ref buf, (uint)stored_len);
+            Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref pending_buf, s.pending), ref buf, stored_len);
         s.pending += stored_len;
 #if DEBUG
         s.compressed_len = (s.compressed_len + 3 + 7) & unchecked((uint)~7);
-        s.compressed_len += ((uint)stored_len + 4) << 3;
+        s.compressed_len += (stored_len + 4) << 3;
         s.bits_sent += 2 * 16;
-        s.bits_sent += (uint)stored_len << 3;
+        s.bits_sent += stored_len << 3;
 #endif
     }
 
@@ -286,7 +286,7 @@ internal static class Tree
     private static void InitBlock(DeflateState s, ref TreeNode dyn_ltree, ref TreeNode dyn_dtree, ref TreeNode bl_tree)
     {
         // Initialize the trees.
-        int n;
+        uint n;
         for (n = 0; n < LCodes; n++)
             Unsafe.Add(ref dyn_ltree, n).fc = 0;
         for (n = 0; n < DCodes; n++)
@@ -310,7 +310,7 @@ internal static class Tree
         Unsafe.Add(ref pending_buf, s.pending++) = (byte)(w >> 8);
     }
 
-    private static void SendBits(DeflateState s, int value, int length, ref byte pending_buf)
+    private static void SendBits(DeflateState s, uint value, int length, ref byte pending_buf)
     {
 #if DEBUG
         Trace.Tracevv($" l {length,2} v {value,4:x} ");
@@ -376,7 +376,7 @@ internal static class Tree
          * 0xf3ffc07f = binary 11110011111111111100000001111111
          */
         uint black_mask = 0xf3ffc07f;
-        int n;
+        uint n;
 
         // Check for non-textual ("black-listed") bytes.
         for (n = 0; n <= 31; n++, black_mask >>= 1)
@@ -384,8 +384,8 @@ internal static class Tree
                 return Z_BINARY;
 
         // Check for textual ("white-listed") bytes.
-        if (Unsafe.Add(ref dyn_ltree, 9).fc != 0 || Unsafe.Add(ref dyn_ltree, 10).fc != 0
-                || Unsafe.Add(ref dyn_ltree, 13).fc != 0)
+        if (Unsafe.Add(ref dyn_ltree, 9U).fc != 0 || Unsafe.Add(ref dyn_ltree, 10U).fc != 0
+                || Unsafe.Add(ref dyn_ltree, 13U).fc != 0)
             return Z_TEXT;
         for (n = 32; n < Literals; n++)
             if (Unsafe.Add(ref dyn_ltree, n).fc != 0)
@@ -399,10 +399,9 @@ internal static class Tree
 
     private static void BuildTree(DeflateState s, TreeDescriptor desc, ref ushort bl_count, ref int heap, ref byte depth)
     {
-        int elems = desc.stat_desc.elems;
-        int n, m;          // iterate over heap elements
+        uint elems = desc.stat_desc.elems;
         int max_code = -1; // largest code with non zero frequency
-        int node;          // new node being created
+        uint node;         // new node being created
         ref TreeNode tree = ref MemoryMarshal.GetReference(desc.dyn_tree.AsSpan());
         ref TreeNode stree = ref desc.stat_desc.static_tree == null ? ref Unsafe.NullRef<TreeNode>()
             : ref MemoryMarshal.GetReference(desc.stat_desc.static_tree.AsSpan());
@@ -414,11 +413,12 @@ internal static class Tree
         s.heap_len = 0;
         s.heap_max = HeapSize;
 
-        for (n = 0; n < elems; n++)
+        uint n = 0;
+        for (; n < elems; n++)
         {
             if (Unsafe.Add(ref tree, n).fc != 0)
             {
-                Unsafe.Add(ref heap, ++s.heap_len) = max_code = n;
+                Unsafe.Add(ref heap, ++s.heap_len) = max_code = (int)n;
                 Unsafe.Add(ref depth, n) = 0;
             }
             else
@@ -434,7 +434,7 @@ internal static class Tree
          */
         while (s.heap_len < 2)
         {
-            node = Unsafe.Add(ref heap, ++s.heap_len) = max_code < 2 ? ++max_code : 0;
+            node = (uint)(Unsafe.Add(ref heap, ++s.heap_len) = max_code < 2 ? ++max_code : 0);
             Unsafe.Add(ref tree, node).fc = 1;
             Unsafe.Add(ref depth, node) = 0;
             s.opt_len--;
@@ -456,11 +456,14 @@ internal static class Tree
         node = elems; // next internal node of the tree
         do
         {
-            PqRemove(s, ref tree, ref n, ref heap, ref depth); // n = node of least frequency
-            m = Unsafe.Add(ref heap, Smallest); // m = node of next least frequency
+            int nn = default;
+            PqRemove(s, ref tree, ref nn, ref heap, ref depth); // n = node of least frequency
+            int mm = Unsafe.Add(ref heap, Smallest); // m = node of next least frequency
 
-            Unsafe.Add(ref heap, --s.heap_max) = n; // keep the nodes sorted by frequency
-            Unsafe.Add(ref heap, --s.heap_max) = m;
+            Unsafe.Add(ref heap, --s.heap_max) = nn; // keep the nodes sorted by frequency
+            n = (uint)nn;
+            Unsafe.Add(ref heap, --s.heap_max) = mm;
+            uint m = (uint)mm;
 
             // Create a new node father of n and m
             Unsafe.Add(ref tree, node).fc = (ushort)(Unsafe.Add(ref tree, n).fc + Unsafe.Add(ref tree, m).fc);
@@ -470,7 +473,7 @@ internal static class Tree
             Unsafe.Add(ref tree, n).dl = Unsafe.Add(ref tree, m).dl = (ushort)node;
 
             // and insert the new node in the heap
-            Unsafe.Add(ref heap, Smallest) = node++;
+            Unsafe.Add(ref heap, Smallest) = (int)node++;
             PqDownHeap(s, ref tree, Smallest, ref heap, ref depth);
 
         } while (s.heap_len >= 2);
@@ -489,18 +492,18 @@ internal static class Tree
     /// <summary>
     /// Restore the heap property by moving down the tree starting at node k, exchanging a node with the smallest of its two sons if necessary, stopping when the heap property is re-established (each father smaller than its two sons).
     /// </summary>
-    private static void PqDownHeap(DeflateState s, ref TreeNode tree, int k, ref int heap, ref byte depth)
+    private static void PqDownHeap(DeflateState s, ref TreeNode tree, uint k, ref int heap, ref byte depth)
     {
-        int v = Unsafe.Add(ref heap, k);
-        int j = k << 1; // left son of k
+        uint v = (uint)Unsafe.Add(ref heap, k);
+        uint j = k << 1; // left son of k
         while (j <= s.heap_len)
         {
             // Set j to the smallest of the two sons:
             if (j < s.heap_len &&
-                Smaller(ref tree, Unsafe.Add(ref heap, j + 1), Unsafe.Add(ref heap, j), ref depth))
+                Smaller(ref tree, (uint)Unsafe.Add(ref heap, j + 1), (uint)Unsafe.Add(ref heap, j), ref depth))
                 j++;
             // Exit if v is smaller than both sons
-            if (Smaller(ref tree, v, Unsafe.Add(ref heap, j), ref depth))
+            if (Smaller(ref tree, v, (uint)Unsafe.Add(ref heap, j), ref depth))
                 break;
 
             // Exchange v with the smallest son
@@ -510,11 +513,11 @@ internal static class Tree
             // And continue down the tree, setting j to the left son of k
             j <<= 1;
         }
-        Unsafe.Add(ref heap, k) = v;
+        Unsafe.Add(ref heap, k) = (int)v;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool Smaller(ref TreeNode tree, int n, int m, ref byte depth)
+    private static bool Smaller(ref TreeNode tree, uint n, uint m, ref byte depth)
     {
         ref TreeNode tn = ref Unsafe.Add(ref tree, n);
         ref TreeNode tm = ref Unsafe.Add(ref tree, m);
@@ -538,11 +541,11 @@ internal static class Tree
     private static void GenBitLen(DeflateState s, TreeDescriptor desc, ref ushort bl_count, ref int heap)
     {
         int max_code = desc.max_code;
-        int @base = desc.stat_desc.extra_base;
-        int max_length = desc.stat_desc.max_length;
-        int h;              // heap index
-        int n, m;           // iterate over the tree elements
-        int bits;           // bit length
+        uint @base = desc.stat_desc.extra_base;
+        uint max_length = desc.stat_desc.max_length;
+        uint h;             // heap index
+        uint n;             // iterate over the tree elements
+        uint bits;          // bit length
         int xbits;          // extra bits
         ushort f;           // frequency
         int overflow = 0;   // number of elements with bit length too large
@@ -556,12 +559,12 @@ internal static class Tree
         /* In a first pass, compute the optimal bit lengths (which may
          * overflow in the case of the bit length tree).
          */
-        Unsafe.Add(ref tree, Unsafe.Add(ref heap, s.heap_max)).dl = 0; // root of the heap
+        Unsafe.Add(ref tree, (uint)Unsafe.Add(ref heap, s.heap_max)).dl = 0; // root of the heap
 
         for (h = s.heap_max + 1; h < HeapSize; h++)
         {
-            n = Unsafe.Add(ref heap, h);
-            bits = Unsafe.Add(ref tree, Unsafe.Add(ref tree, n).dl).dl + 1;
+            n = (uint)Unsafe.Add(ref heap, h);
+            bits = Unsafe.Add(ref tree, (uint)Unsafe.Add(ref tree, n).dl).dl + 1U;
             if (bits > max_length)
             {
                 bits = max_length;
@@ -613,14 +616,14 @@ internal static class Tree
             n = Unsafe.Add(ref bl_count, bits);
             while (n != 0)
             {
-                m = Unsafe.Add(ref heap, --h);
+                int m = Unsafe.Add(ref heap, --h);
                 if (m > max_code)
                     continue;
-                ref TreeNode tm = ref Unsafe.Add(ref tree, m);
-                if (tm.dl != (uint)bits)
+                ref TreeNode tm = ref Unsafe.Add(ref tree, (uint)m);
+                if (tm.dl != bits)
                 {
                     Trace.Tracev($"code {m} bits {tm.dl}->{bits}\n");
-                    s.opt_len += ((uint)bits - tm.dl) * tm.fc;
+                    s.opt_len += (bits - tm.dl) * tm.fc;
                     tm.dl = (ushort)bits;
                 }
                 n--;
@@ -639,7 +642,7 @@ internal static class Tree
         /* The distribution counts are first used to generate the code values
          * without bit reversal.
          */
-        for (int bits = 1; bits <= MaxBits; bits++)
+        for (uint bits = 1; bits <= MaxBits; bits++)
         {
             code = (code + Unsafe.Add(ref bl_count, bits - 1)) << 1;
             Unsafe.Add(ref next_code, bits) = (ushort)code;
@@ -647,12 +650,12 @@ internal static class Tree
         /* Check that the bit counts in bl_count are consistent. The last code
          * must be all ones.
          */
-        Debug.Assert(code + Unsafe.Add(ref bl_count, MaxBits) - 1 == (1 << MaxBits) - 1, "inconsistent bit counts");
+        Debug.Assert(code + Unsafe.Add(ref bl_count, (uint)MaxBits) - 1 == (1 << MaxBits) - 1, "inconsistent bit counts");
         Trace.Tracev($"\ngen_codes: max_code {max_code} ");
 
-        for (int n = 0; n <= max_code; n++)
+        for (uint n = 0; n <= max_code; n++)
         {
-            int len = Unsafe.Add(ref tree, n).dl;
+            uint len = Unsafe.Add(ref tree, n).dl;
             if (len == 0)
                 continue;
             // Now reverse the bits
@@ -667,7 +670,7 @@ internal static class Tree
     /// <summary>
     /// Reverse the first len bits of a code, using straightforward code (a faster method would use a table).
     /// </summary>
-    private static uint BiReverse(uint code, int len)
+    private static uint BiReverse(uint code, uint len)
     {
         uint res = 0;
         do
@@ -682,10 +685,10 @@ internal static class Tree
     /// <summary>
     /// Construct the Huffman tree for the bit lengths and return the index in bl_order of the last bit length code to send.
     /// </summary>
-    private static int BuildBlTree(DeflateState s, ref TreeNode dyn_ltree, ref TreeNode dyn_dtree, ref TreeNode bl_tree,
+    private static uint BuildBlTree(DeflateState s, ref TreeNode dyn_ltree, ref TreeNode dyn_dtree, ref TreeNode bl_tree,
         ref ushort bl_count, ref int heap, ref byte depth, ref ushort bl_order)
     {
-        int max_blindex; // index of last bit length code of non zero freq
+        uint max_blindex; // index of last bit length code of non zero freq
 
         // Determine the bit length frequencies for literal and distance trees
         ScanTree(ref dyn_ltree, s.l_desc.max_code, ref bl_tree);
@@ -703,11 +706,11 @@ internal static class Tree
          */
         for (max_blindex = BlCodes - 1; max_blindex >= 3; max_blindex--)
         {
-            if (Unsafe.Add(ref bl_tree, Unsafe.Add(ref bl_order, max_blindex)).dl != 0)
+            if (Unsafe.Add(ref bl_tree, (uint)Unsafe.Add(ref bl_order, max_blindex)).dl != 0)
                 break;
         }
         // Update opt_len to include the bit length tree and counts
-        s.opt_len += 3 * ((uint)max_blindex + 1) + 5 + 5 + 4;
+        s.opt_len += 3 * (max_blindex + 1) + 5 + 5 + 4;
         Trace.Tracev($"\ndyn trees: dyn {s.opt_len}, stat {s.static_len}");
 
         return max_blindex;
@@ -715,22 +718,21 @@ internal static class Tree
 
     private static void ScanTree(ref TreeNode tree, int max_code, ref TreeNode bl_tree)
     {
-        int n;                      // iterates over all tree elements */
-        int prevlen = -1;           // last emitted length
-        int curlen;                 // length of current code
-        int nextlen = tree.dl;      // length of next code
-        int count = 0;              // repeat count of the current code
-        int max_count = 7;          // max repeat count
-        int min_count = 4;          // min repeat count
+        uint prevlen = uint.MaxValue; // last emitted length
+        uint curlen;                  // length of current code
+        uint nextlen = tree.dl;       // length of next code
+        int count = 0;                // repeat count of the current code
+        int max_count = 7;            // max repeat count
+        int min_count = 4;            // min repeat count
 
         if (nextlen == 0)
         {
             max_count = 138;
             min_count = 3;
         }
-        Unsafe.Add(ref tree, max_code + 1).dl = 0xffff; // guard
+        Unsafe.Add(ref tree, (uint)(max_code + 1)).dl = 0xffff; // guard
 
-        for (n = 0; n <= max_code; n++)
+        for (uint n = 0; n <= max_code; n++)
         {
             curlen = nextlen;
             nextlen = Unsafe.Add(ref tree, n + 1).dl;
@@ -779,7 +781,7 @@ internal static class Tree
     /// <summary>
     /// Saves the match info and tally the frequency counts.
     /// </summary>
-    internal static bool Tally(DeflateState s, int dist, int lc,
+    internal static bool Tally(DeflateState s, uint dist, uint lc,
         ref byte pending_buf, ref TreeNode dyn_ltree, ref TreeNode dyn_dtree,
         ref byte dist_code, ref byte length_code)
     {
@@ -801,8 +803,8 @@ internal static class Tree
                 && lc <= MaxMatch - MinMatch
                 && DCode(dist, ref dist_code) < DCodes, "_tr_tally: bad match");
 
-            Unsafe.Add(ref dyn_ltree, Unsafe.Add(ref length_code, lc) + Literals + 1).fc++;
-            Unsafe.Add(ref dyn_dtree, (int)DCode(dist, ref dist_code)).fc++;
+            Unsafe.Add(ref dyn_ltree, (uint)Unsafe.Add(ref length_code, lc) + Literals + 1).fc++;
+            Unsafe.Add(ref dyn_dtree, DCode(dist, ref dist_code)).fc++;
         }
         return s.sym_next == s.sym_end;
     }
@@ -815,12 +817,12 @@ internal static class Tree
     {
         if (s.sym_next != 0)
         {
-            int sx = 0; // running index in sym_buf
+            uint sx = 0; // running index in sym_buf
             do
             {
-                int dist = Unsafe.Add(ref pending_buf, s.lit_bufsize + sx++) & 0xff; // distance of matched string
-                dist += (Unsafe.Add(ref pending_buf, s.lit_bufsize + sx++) & 0xff) << 8;
-                int lc = Unsafe.Add(ref pending_buf, s.lit_bufsize + sx++); // match length or unmatched char (if dist == 0)
+                uint dist = Unsafe.Add(ref pending_buf, s.lit_bufsize + sx++) & 0xffU; // distance of matched string
+                dist += (Unsafe.Add(ref pending_buf, s.lit_bufsize + sx++) & 0xffU) << 8;
+                uint lc = Unsafe.Add(ref pending_buf, s.lit_bufsize + sx++); // match length or unmatched char (if dist == 0)
                 if (dist == 0)
                 {
                     SendCode(s, ref Unsafe.Add(ref ltree, lc), ref pending_buf); // send a literal byte
@@ -831,23 +833,23 @@ internal static class Tree
                 else
                 {
                     // Here, lc is the match length - MIN_MATCH
-                    int code = Unsafe.Add(ref length_code, lc); // the code to send
+                    uint code = Unsafe.Add(ref length_code, lc); // the code to send
                     SendCode(s, ref Unsafe.Add(ref ltree, code + Literals + 1), ref pending_buf); // send length code
                     int extra = Unsafe.Add(ref extra_lbits, code); // number of extra bits to send
                     if (extra != 0)
                     {
-                        lc -= Unsafe.Add(ref base_length, code);
+                        lc -= (uint)Unsafe.Add(ref base_length, code);
                         SendBits(s, lc, extra, ref pending_buf); // send the extra length bits
                     }
                     dist--; // dist is now the match distance - 1
-                    code = (int)DCode(dist, ref dist_code);
+                    code = DCode(dist, ref dist_code);
                     Debug.Assert(code < DCodes, "bad d_code");
 
                     SendCode(s, ref Unsafe.Add(ref dtree, code), ref pending_buf); // send the distance code
                     extra = Unsafe.Add(ref extra_dbits, code);
                     if (extra != 0)
                     {
-                        dist -= Unsafe.Add(ref base_dist, code);
+                        dist -= (uint)Unsafe.Add(ref base_dist, code);
                         SendBits(s, dist, extra, ref pending_buf); // send the extra distance bits
                     }
                 } // literal or match pair ?
@@ -863,13 +865,13 @@ internal static class Tree
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static uint DCode(int dist, ref byte dist_code) =>
+    internal static uint DCode(uint dist, ref byte dist_code) =>
         dist < 256 ? Unsafe.Add(ref dist_code, dist) : Unsafe.Add(ref dist_code, 256 + ((dist) >> 7));
 
     /// <summary>
     /// Sends the header for a block using dynamic Huffman trees: the counts, the lengths of the bit length codes, the literal tree and the distance tree.
     /// </summary>
-    private static void SendAllTrees(DeflateState s, int lcodes, int dcodes, int blcodes,
+    private static void SendAllTrees(DeflateState s, uint lcodes, uint dcodes, uint blcodes,
         ref byte pending_buf, ref TreeNode dyn_ltree, ref TreeNode dyn_dtree, ref TreeNode bl_tree, ref ushort bl_order)
     {
         Debug.Assert(lcodes >= 257 && dcodes >= 1 && blcodes >= 4, "not enough codes");
@@ -878,9 +880,9 @@ internal static class Tree
         SendBits(s, lcodes - 257, 5, ref pending_buf); // not +255 as stated in appnote.txt
         SendBits(s, dcodes - 1, 5, ref pending_buf);
         SendBits(s, blcodes - 4, 4, ref pending_buf); // not -3 as stated in appnote.txt
-        for (int rank = 0; rank < blcodes; rank++)
+        for (uint rank = 0; rank < blcodes; rank++)
         {
-            ushort code = Unsafe.Add(ref bl_order, rank);
+            uint code = Unsafe.Add(ref bl_order, rank);
             Trace.Tracev($"\nbl code {code,2} ");
             SendBits(s, Unsafe.Add(ref bl_tree, code).dl, 3, ref pending_buf);
         }
@@ -902,14 +904,14 @@ internal static class Tree
     /// <summary>
     /// Sends a literal or distance tree in compressed form, using the codes in bl_tree.
     /// </summary>
-    private static void SendTree(DeflateState s, ref TreeNode tree, int max_code, ref byte pending_buf, ref TreeNode bl_tree)
+    private static void SendTree(DeflateState s, ref TreeNode tree, uint max_code, ref byte pending_buf, ref TreeNode bl_tree)
     {
-        int prevlen = -1;           // last emitted length
-        int curlen;                 // length of current code
-        int nextlen = tree.dl;   // length of next code
-        int count = 0;              // repeat count of the current code
-        int max_count = 7;          // max repeat count
-        int min_count = 4;          // min repeat count
+        uint prevlen = uint.MaxValue;   // last emitted length
+        uint curlen;                    // length of current code
+        uint nextlen = tree.dl;         // length of next code
+        uint count = 0;                 // repeat count of the current code
+        int max_count = 7;              // max repeat count
+        int min_count = 4;              // min repeat count
 
         if (nextlen == 0)
         {
@@ -917,7 +919,7 @@ internal static class Tree
             min_count = 3;
         }
 
-        for (int n = 0; n <= max_code; n++)
+        for (uint n = 0; n <= max_code; n++)
         {
             curlen = nextlen;
             nextlen = Unsafe.Add(ref tree, n + 1).dl;
@@ -974,6 +976,6 @@ internal static class Tree
         }
     }
 #if DEBUG
-    private static bool IsGraph(int ch) => ch > 32 && ch < 127;
+    private static bool IsGraph(uint ch) => ch > 32 && ch < 127;
 #endif
 }

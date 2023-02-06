@@ -10,7 +10,7 @@ namespace ZLibDotNet.Deflate;
 
 internal static partial class Deflater
 {
-    internal static int DeflateSetDictionary(ZStream strm, byte[] dictionary, int dictLength)
+    internal static int DeflateSetDictionary(ZStream strm, byte[] dictionary, uint dictLength)
     {
         if (DeflateStateCheck(strm) || dictionary == null)
             return Z_STREAM_ERROR;
@@ -22,10 +22,10 @@ internal static partial class Deflater
 
         // when using zlib wrappers, compute Adler-32 for provided dictionary
         if (wrap == 1)
-            strm.Adler = Adler32.Update(strm.Adler, ref MemoryMarshal.GetReference(dictionary.AsSpan()), (uint)dictLength);
+            strm.Adler = Adler32.Update(strm.Adler, ref MemoryMarshal.GetReference(dictionary.AsSpan()), dictLength);
         s.wrap = 0; // avoid computing Adler-32 in ReadBuf
 
-        int next_in = 0;
+        uint next_in = 0;
         // if dictionary would fill window, just replace the history
         if (dictLength >= s.w_size)
         {
@@ -43,12 +43,12 @@ internal static partial class Deflater
         // insert dictionary into window and hash
         uint avail = strm.avail_in;
         byte[] input = strm._input;
-        int next = strm.next_in;
-        strm.avail_in = (uint)dictLength;
+        uint next = strm.next_in;
+        strm.avail_in = dictLength;
         strm._input = dictionary;
         strm.next_in = next_in;
 
-        int str, n;
+        uint str, n;
         ref byte window = ref MemoryMarshal.GetReference(s.window.AsSpan());
         ref ushort prev = ref MemoryMarshal.GetReference(s.prev.AsSpan());
         ref ushort head = ref MemoryMarshal.GetReference(s.head.AsSpan());
@@ -70,11 +70,11 @@ internal static partial class Deflater
             FillWindow(s, ref window, ref prev, ref head);
         }
         s.strstart += s.lookahead;
-        s.block_start = s.strstart;
+        s.block_start = (int)s.strstart;
         s.insert = s.lookahead;
         s.lookahead = 0;
         s.match_length = s.prev_length = MinMatch - 1;
-        s.match_available = 0;
+        s.match_available = false;
         strm._input = input;
         strm.next_in = next;
         strm.avail_in = avail;

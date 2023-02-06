@@ -7,11 +7,11 @@ internal class StaticTree
 {
     internal readonly TreeNode[] static_tree; // static tree or null
     internal readonly int[] extra_bits;       // extra bits for each code or null
-    internal readonly int extra_base;         // base index for extra_bits
-    internal readonly int elems;              // max number of elements in the tree
-    internal readonly int max_length;         // max bit length for the codes
+    internal readonly uint extra_base;         // base index for extra_bits
+    internal readonly uint elems;              // max number of elements in the tree
+    internal readonly uint max_length;         // max bit length for the codes
 
-    public StaticTree(TreeNode[] static_tree, int[] extra_bits, int extra_base, int elems, int max_length)
+    public StaticTree(TreeNode[] static_tree, int[] extra_bits, uint extra_base, uint elems, uint max_length)
     {
         this.static_tree = static_tree;
         this.extra_bits = extra_bits;

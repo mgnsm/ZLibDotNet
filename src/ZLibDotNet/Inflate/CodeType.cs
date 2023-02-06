@@ -4,7 +4,7 @@
 namespace ZLibDotNet.Inflate;
 
 /// <summary>
-/// Type of code to build for <see cref="Inflater.InflateTable(CodeType, ref ushort, int, ref Code, ref int, ref ushort, ref int)"/>.
+/// Type of code to build for <see cref="Inflater.InflateTable(CodeType, ref ushort, uint, ref Code, ref int, ref ushort, ref uint)"/>.
 /// </summary>
 internal enum CodeType : byte
 {

@@ -135,7 +135,7 @@ public partial class ZLib : IZLib
         if (strm == null || dictionary == null || dictLength < 0 || dictLength > dictionary.Length)
             return Z_STREAM_ERROR;
 
-        return Deflater.DeflateSetDictionary(strm, dictionary, dictLength);
+        return Deflater.DeflateSetDictionary(strm, dictionary, (uint)dictLength);
     }
 
     /// <summary>

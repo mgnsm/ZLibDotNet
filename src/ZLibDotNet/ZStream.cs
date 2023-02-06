@@ -13,11 +13,11 @@ namespace ZLibDotNet;
 public sealed class ZStream
 #pragma warning restore CA1711
 {
-    internal int next_in;       // the index of next input byte in the input buffer
+    internal uint next_in;       // the index of next input byte in the input buffer
     internal uint avail_in;     // number of bytes available at next_in
     internal uint total_in;     // total number of input bytes read so far
 
-    internal int next_out;      // the index of next output byte in the output buffer
+    internal uint next_out;     // the index of next output byte in the output buffer
     internal uint avail_out;    // remaining free space at next_out
     internal uint total_out;    // total number of bytes output so far
 
@@ -72,11 +72,11 @@ public sealed class ZStream
     /// <remarks>If you choose to set this optional property, you should set it after you have set the <see cref="Input"/> property.</remarks>
     public int NextIn
     {
-        get => next_in;
+        get => (int)next_in;
         set
         {
             ValidateOffset(value, AvailableIn, _input, nameof(Input));
-            next_in = value;
+            next_in = (uint)value;
         }
     }
 
@@ -127,11 +127,11 @@ public sealed class ZStream
     /// <remarks>If you choose to set this optional property, you should set it after you have set the <see cref="Output"/> property.</remarks>
     public int NextOut
     {
-        get => next_out;
+        get => (int)next_out;
         set
         {
             ValidateOffset(value, AvailableOut, _output, nameof(Output));
-            next_out = value;
+            next_out = (uint)value;
         }
     }
 
@@ -155,7 +155,7 @@ public sealed class ZStream
     /// </summary>
     public uint Adler { get; internal set; }
 
-    private static void ValidateAvailableBytes(int value, int offset, byte[] buffer, string bufferName, string offsetPropertyName)
+    private static void ValidateAvailableBytes(int value, uint offset, byte[] buffer, string bufferName, string offsetPropertyName)
     {
         if (value < 0 || value > (buffer?.Length ?? 0) - offset)
             throw new ArgumentOutOfRangeException(nameof(value),

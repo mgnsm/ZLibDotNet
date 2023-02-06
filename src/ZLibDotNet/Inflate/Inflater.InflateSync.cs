@@ -17,7 +17,7 @@ internal static partial class Inflater
         if (strm.avail_in == 0 && state.bits < 8)
             return Z_BUF_ERROR;
 
-        int len = 0;
+        uint len = 0;
         // if first time, start search in bit buffer
         if (state.mode != InflateMode.Sync)
         {
@@ -39,9 +39,9 @@ internal static partial class Inflater
         }
 
         // search available input
-        uint @in = SyncSearch(ref state.have, ref MemoryMarshal.GetReference(strm._input.AsSpan(strm.next_in)), (int)strm.avail_in);
+        uint @in = SyncSearch(ref state.have, ref MemoryMarshal.GetReference(strm._input.AsSpan((int)strm.next_in)), strm.avail_in);
         strm.avail_in -= @in;
-        strm.next_in += (int)@in;
+        strm.next_in += @in;
         strm.total_in += @in;
 
         // return no joy or set up to restart Inflate on a new block
@@ -66,10 +66,10 @@ internal static partial class Inflater
         return Z_OK;
     }
 
-    private static uint SyncSearch(ref int have, ref byte buf, int len)
+    private static uint SyncSearch(ref uint have, ref byte buf, uint len)
     {
-        int got = have;
-        int next = 0;
+        uint got = have;
+        uint next = 0;
         while (next < len && got < 4)
         {
             byte b = Unsafe.Add(ref buf, next);
@@ -82,6 +82,6 @@ internal static partial class Inflater
             next++;
         }
         have = got;
-        return (uint)next;
+        return next;
     }
 }

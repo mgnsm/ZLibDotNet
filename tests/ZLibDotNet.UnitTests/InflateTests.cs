@@ -458,7 +458,7 @@ public class InflateTests
 
         // Call InflateTable() directly in order to manifest not-enough errors, since zlib ensures that enough is always enough.
         ref Code next = ref ptrToTable;
-        int offset = 0;
+        uint offset = 0;
         Assert.AreEqual(1, Inflater.InflateTable(CodeType.Dists, ref ptrToLens, 16, ref next, ref bits, ref ptrToWork, ref offset));
 
         next = ptrToTable;
