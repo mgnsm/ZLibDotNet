@@ -3,7 +3,6 @@
 
 using System;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using static ZLibDotNet.Deflate.Constants;
 
@@ -202,7 +201,7 @@ internal static partial class Deflater
                 PutShort(s, strm.Adler >> 16, ref pending_buf);
                 PutShort(s, strm.Adler & 0xffff, ref pending_buf);
             }
-            strm.Adler = Adler32.Update(0, ref Unsafe.NullRef<byte>(), 0);
+            strm.Adler = Adler32.Update(0, ref netUnsafe.NullRef<byte>(), 0);
             s.status = BusyState;
 
             // Compression must start with an empty pending buffer
@@ -249,7 +248,7 @@ internal static partial class Deflater
                 }
                 else if (flush != Z_BLOCK) // FULL_FLUSH or SYNC_FLUSH
                 {
-                    Tree.StoredBlock(s, ref Unsafe.NullRef<byte>(), 0, 0, ref pending_buf);
+                    Tree.StoredBlock(s, ref netUnsafe.NullRef<byte>(), 0, 0, ref pending_buf);
                     /* For a full flush, this empty block will be recognized
                      * as a special marker by InflateSync().
                      */
@@ -346,7 +345,7 @@ internal static partial class Deflater
         if (len == 0)
             return;
 
-        Unsafe.CopyBlockUnaligned(ref MemoryMarshal.GetReference(strm._output.AsSpan((int)strm.next_out)),
+        netUnsafe.CopyBlockUnaligned(ref MemoryMarshal.GetReference(strm._output.AsSpan((int)strm.next_out)),
             ref MemoryMarshal.GetReference(s.pending_out.AsSpan((int)s.pendingOutOffset)), len);
         strm.next_out += len;
         s.pendingOutOffset += len;
@@ -422,7 +421,7 @@ internal static partial class Deflater
              * including any pending bits. This also updates the debugging counts.
              */
             last = flush == Z_FINISH && len == left + s.strm.avail_in ? 1U : 0U;
-            Tree.StoredBlock(s, ref Unsafe.NullRef<byte>(), 0, last, ref pending_buf);
+            Tree.StoredBlock(s, ref netUnsafe.NullRef<byte>(), 0, last, ref pending_buf);
 
             // Replace the lengths in the dummy stored block with len.
             Unsafe.Add(ref pending_buf, s.pending - 4) = (byte)len;
@@ -443,7 +442,7 @@ internal static partial class Deflater
             {
                 if (left > len)
                     left = len;
-                Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref next_out, s.strm.next_out),
+                netUnsafe.CopyBlockUnaligned(ref Unsafe.Add(ref next_out, s.strm.next_out),
                     ref Unsafe.Add(ref window, (uint)s.block_start), left);
                 s.strm.next_out += left;
                 s.strm.avail_out -= left;
@@ -478,7 +477,7 @@ internal static partial class Deflater
             if (used >= s.w_size) // supplant the previous history
             {
                 s.matches = 2; // clear hash
-                Unsafe.CopyBlockUnaligned(ref window, ref Unsafe.Subtract(ref next_in, s.w_size), s.w_size);
+                netUnsafe.CopyBlockUnaligned(ref window, ref Unsafe.Subtract(ref next_in, s.w_size), s.w_size);
 
                 s.strstart = s.w_size;
                 s.insert = s.strstart;
@@ -489,13 +488,13 @@ internal static partial class Deflater
                 {
                     // Slide the window down
                     s.strstart -= s.w_size;
-                    Unsafe.CopyBlockUnaligned(ref window, ref Unsafe.Add(ref window, s.w_size), s.strstart);
+                    netUnsafe.CopyBlockUnaligned(ref window, ref Unsafe.Add(ref window, s.w_size), s.strstart);
                     if (s.matches < 2)
                         s.matches++; // add a pending SlideHash()
                     if (s.insert > s.strstart)
                         s.insert = s.strstart;
                 }
-                Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref window, s.strstart), ref Unsafe.Subtract(ref next_in, used), used);
+                netUnsafe.CopyBlockUnaligned(ref Unsafe.Add(ref window, s.strstart), ref Unsafe.Subtract(ref next_in, used), used);
                 s.strstart += used;
                 s.insert += Math.Min(used, s.w_size - s.insert);
             }
@@ -521,7 +520,7 @@ internal static partial class Deflater
             // Slide the window down.
             s.block_start -= (int)s.w_size;
             s.strstart -= s.w_size;
-            Unsafe.CopyBlockUnaligned(ref window, ref Unsafe.Add(ref window, s.w_size), s.strstart);
+            netUnsafe.CopyBlockUnaligned(ref window, ref Unsafe.Add(ref window, s.w_size), s.strstart);
             if (s.matches < 2)
                 s.matches++;    // add a pending SlideHash()
             have += s.w_size;   // more space now
@@ -575,7 +574,7 @@ internal static partial class Deflater
 
         strm.avail_in -= len;
 
-        Unsafe.CopyBlockUnaligned(ref buf, ref MemoryMarshal.GetReference(strm._input.AsSpan((int)strm.next_in)), len);
+        netUnsafe.CopyBlockUnaligned(ref buf, ref MemoryMarshal.GetReference(strm._input.AsSpan((int)strm.next_in)), len);
         if (strm.deflateState.wrap == 1)
             strm.Adler = Adler32.Update(strm.Adler, ref buf, len);
 
@@ -668,7 +667,7 @@ internal static partial class Deflater
             if (s.strstart >= wsize + s.w_size - MinLookAhead)
             {
                 uint sourceBytesToCopy = wsize - more;
-                Unsafe.CopyBlockUnaligned(ref window, ref Unsafe.Add(ref window, wsize), sourceBytesToCopy);
+                netUnsafe.CopyBlockUnaligned(ref window, ref Unsafe.Add(ref window, wsize), sourceBytesToCopy);
                 s.match_start -= wsize;
                 s.strstart -= wsize; // we now have strstart >= MaxDist
                 s.block_start -= (int)wsize;
@@ -740,7 +739,7 @@ internal static partial class Deflater
                 init = s.window_size - curr;
                 if (init > WinInit)
                     init = WinInit;
-                Unsafe.InitBlockUnaligned(ref Unsafe.Add(ref window, curr), 0, init);
+                netUnsafe.InitBlockUnaligned(ref Unsafe.Add(ref window, curr), 0, init);
                 s.high_water = curr + init;
             }
             else if (s.high_water < curr + WinInit)
@@ -752,7 +751,7 @@ internal static partial class Deflater
                 init = curr + WinInit - s.high_water;
                 if (init > s.window_size - s.high_water)
                     init = s.window_size - s.high_water;
-                Unsafe.InitBlockUnaligned(ref Unsafe.Add(ref window, s.high_water), 0, init);
+                netUnsafe.InitBlockUnaligned(ref Unsafe.Add(ref window, s.high_water), 0, init);
                 s.high_water += init;
             }
         }
@@ -798,7 +797,7 @@ internal static partial class Deflater
         ref int extra_dbits, ref int extra_lbits)
     {
         uint block_start = (uint)s.block_start;
-        ref byte buf = ref s.block_start >= 0L ? ref Unsafe.Add(ref window, block_start) : ref Unsafe.NullRef<byte>();
+        ref byte buf = ref s.block_start >= 0L ? ref Unsafe.Add(ref window, block_start) : ref netUnsafe.NullRef<byte>();
         Tree.FlushBlock(s, ref buf, s.strstart - block_start, last,
             ref pending_buf, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap, ref depth, ref bl_order,
             ref dist_code, ref length_code, ref base_dist, ref base_length, ref extra_dbits, ref extra_lbits);
@@ -899,12 +898,12 @@ internal static partial class Deflater
                         && prev == (scan = ref Unsafe.Add(ref scan, 1U))
                         && prev == (scan = ref Unsafe.Add(ref scan, 1U))
                         && prev == (scan = ref Unsafe.Add(ref scan, 1U))
-                        && Unsafe.IsAddressLessThan(ref scan, ref strend));
-                    s.match_length = MaxMatch - (uint)Unsafe.ByteOffset(ref scan, ref strend);
+                        && netUnsafe.IsAddressLessThan(ref scan, ref strend));
+                    s.match_length = MaxMatch - (uint)netUnsafe.ByteOffset(ref scan, ref strend);
                     if (s.match_length > s.lookahead)
                         s.match_length = s.lookahead;
                 }
-                Debug.Assert(Unsafe.IsAddressGreaterThan(ref Unsafe.Add(ref window, s.window_size - 1), ref scan), "wild scan");
+                Debug.Assert(netUnsafe.IsAddressGreaterThan(ref Unsafe.Add(ref window, s.window_size - 1), ref scan), "wild scan");
             }
 
             // Emit match if have run of MinMatch or longer, else emit literal
@@ -1201,11 +1200,11 @@ internal static partial class Deflater
                 && (scan = ref Unsafe.Add(ref scan, 1U)) == (match = ref Unsafe.Add(ref match, 1U))
                 && (scan = ref Unsafe.Add(ref scan, 1U)) == (match = ref Unsafe.Add(ref match, 1U))
                 && (scan = ref Unsafe.Add(ref scan, 1U)) == (match = ref Unsafe.Add(ref match, 1U))
-                && Unsafe.IsAddressLessThan(ref scan, ref strend));
+                && netUnsafe.IsAddressLessThan(ref scan, ref strend));
 
             Debug.Assert(scan <= window + (s.window_size - 1), "wild scan");
 
-            len = MaxMatch - (uint)Unsafe.ByteOffset(ref scan, ref strend);
+            len = MaxMatch - (uint)netUnsafe.ByteOffset(ref scan, ref strend);
             scan = ref Unsafe.Subtract(ref strend, (uint)MaxMatch);
 
             if (len > best_len)

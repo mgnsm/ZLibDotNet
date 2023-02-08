@@ -2,7 +2,6 @@
 // Managed C#/.NET code Copyright (C) 2022 Magnus Montin
 
 using System;
-using System.Runtime.CompilerServices;
 
 namespace ZLibDotNet.Inflate;
 
@@ -10,7 +9,7 @@ internal static partial class Inflater
 {
     internal static int InflateSetDictionary(ZStream strm, ref byte dictionary, uint dictLength)
     {
-        if (InflateStateCheck(strm) || Unsafe.IsNullRef(ref dictionary))
+        if (InflateStateCheck(strm) || netUnsafe.IsNullRef(ref dictionary))
             return Z_STREAM_ERROR;
 
         InflateState state = strm.inflateState;
@@ -20,7 +19,7 @@ internal static partial class Inflater
         // check for correct dictionary identifier
         if (state.mode == InflateMode.Dict)
         {
-            uint dictid = Adler32.Update(0, ref Unsafe.NullRef<byte>(), 0);
+            uint dictid = Adler32.Update(0, ref netUnsafe.NullRef<byte>(), 0);
             dictid = Adler32.Update(dictid, ref dictionary, dictLength);
             if (dictid != state.check)
                 return Z_DATA_ERROR;

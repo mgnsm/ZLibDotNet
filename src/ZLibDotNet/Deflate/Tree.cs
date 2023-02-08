@@ -3,7 +3,6 @@
 
 using System;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using static ZLibDotNet.Deflate.Constants;
 
@@ -205,11 +204,11 @@ internal static class Tree
         }
         else
         {
-            Debug.Assert(!Unsafe.IsNullRef(ref buf), "lost buf");
+            Debug.Assert(!netUnsafe.IsNullRef(ref buf), "lost buf");
             opt_lenb = static_lenb = stored_len + 5; // force a stored block
         }
 
-        if (stored_len + 4 <= opt_lenb && !Unsafe.IsNullRef(ref buf))
+        if (stored_len + 4 <= opt_lenb && !netUnsafe.IsNullRef(ref buf))
         {
             // 4: two words for the lengths
 
@@ -269,8 +268,8 @@ internal static class Tree
         Windup(s, ref pending_buf); // align on byte boundary
         PutShort(s, (ushort)stored_len, ref pending_buf);
         PutShort(s, (ushort)~stored_len, ref pending_buf);
-        if (!Unsafe.IsNullRef(ref buf) && stored_len != 0)
-            Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref pending_buf, s.pending), ref buf, stored_len);
+        if (!netUnsafe.IsNullRef(ref buf) && stored_len != 0)
+            netUnsafe.CopyBlockUnaligned(ref Unsafe.Add(ref pending_buf, s.pending), ref buf, stored_len);
         s.pending += stored_len;
 #if DEBUG
         s.compressed_len = (s.compressed_len + 3 + 7) & unchecked((uint)~7);
@@ -403,7 +402,7 @@ internal static class Tree
         int max_code = -1; // largest code with non zero frequency
         uint node;         // new node being created
         ref TreeNode tree = ref MemoryMarshal.GetReference(desc.dyn_tree.AsSpan());
-        ref TreeNode stree = ref desc.stat_desc.static_tree == null ? ref Unsafe.NullRef<TreeNode>()
+        ref TreeNode stree = ref desc.stat_desc.static_tree == null ? ref netUnsafe.NullRef<TreeNode>()
             : ref MemoryMarshal.GetReference(desc.stat_desc.static_tree.AsSpan());
 
         /* Construct the initial heap, with least frequent element in
@@ -550,11 +549,11 @@ internal static class Tree
         ushort f;           // frequency
         int overflow = 0;   // number of elements with bit length too large
         ref TreeNode tree = ref MemoryMarshal.GetReference(desc.dyn_tree.AsSpan());
-        ref TreeNode stree = ref desc.stat_desc.static_tree == null ? ref Unsafe.NullRef<TreeNode>()
+        ref TreeNode stree = ref desc.stat_desc.static_tree == null ? ref netUnsafe.NullRef<TreeNode>()
             : ref MemoryMarshal.GetReference(desc.stat_desc.static_tree.AsSpan());
         ref int extra = ref MemoryMarshal.GetReference(desc.stat_desc.extra_bits.AsSpan());
 
-        Unsafe.InitBlock(ref Unsafe.As<ushort, byte>(ref bl_count), 0, MaxBits * sizeof(ushort));
+        netUnsafe.InitBlock(ref netUnsafe.As<ushort, byte>(ref bl_count), 0, MaxBits * sizeof(ushort));
 
         /* In a first pass, compute the optimal bit lengths (which may
          * overflow in the case of the bit length tree).
@@ -661,7 +660,7 @@ internal static class Tree
             // Now reverse the bits
             Unsafe.Add(ref tree, n).fc = (ushort)BiReverse(Unsafe.Add(ref next_code, len)++, len);
 #if DEBUG
-            Trace.Tracecv(!Unsafe.AreSame(ref tree, ref MemoryMarshal.GetReference(s_ltree.AsSpan())),
+            Trace.Tracecv(!netUnsafe.AreSame(ref tree, ref MemoryMarshal.GetReference(s_ltree.AsSpan())),
                 $"\nn {n,3} {(IsGraph(n) ? Convert.ToChar(n) : ' ')} l {len,2} c {Unsafe.Add(ref tree, n).dl,4:x} ({Unsafe.Add(ref next_code, len) - 1:x)}) ");
 #endif
         }

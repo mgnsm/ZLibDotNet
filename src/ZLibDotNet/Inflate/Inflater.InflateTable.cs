@@ -2,7 +2,6 @@
 // Managed C#/.NET code Copyright (C) 2022 Magnus Montin
 
 using System;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace ZLibDotNet.Inflate;
@@ -41,7 +40,7 @@ internal static partial class Inflater
         ref ushort ptrToCount = ref MemoryMarshal.GetReference(count.AsSpan());
 
         // accumulate lengths for codes (assumes lens[] all in 0..MAXBITS)
-        Unsafe.InitBlock(ref Unsafe.As<ushort, byte>(ref ptrToCount), 0, Length * sizeof(ushort));
+        netUnsafe.InitBlock(ref netUnsafe.As<ushort, byte>(ref ptrToCount), 0, Length * sizeof(ushort));
 
         uint sym = 0; // index of code symbols
         for (; sym < codes; sym++)
@@ -101,8 +100,8 @@ internal static partial class Inflater
         ref ushort lext = ref MemoryMarshal.GetReference(s_lext.AsSpan());
         ref ushort dbase = ref MemoryMarshal.GetReference(s_dbase.AsSpan());
         ref ushort dext = ref MemoryMarshal.GetReference(s_dext.AsSpan());
-        ref ushort @base = ref Unsafe.NullRef<ushort>(); // base value table to use
-        ref ushort extra = ref Unsafe.NullRef<ushort>(); // extra bits table to use
+        ref ushort @base = ref netUnsafe.NullRef<ushort>(); // base value table to use
+        ref ushort extra = ref netUnsafe.NullRef<ushort>(); // extra bits table to use
         uint match; // use base and extra for symbol >= match
         // set up for code type
         switch (type)

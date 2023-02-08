@@ -3,7 +3,6 @@
 
 using System;
 using System.Buffers;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace ZLibDotNet.Inflate;
@@ -86,14 +85,14 @@ internal static partial class Inflater
         copy.back = state.back;
         copy.was = state.was;
 
-        Unsafe.CopyBlock(ref Unsafe.As<ushort, byte>(ref MemoryMarshal.GetReference(copy.lens.AsSpan())),
-            ref Unsafe.As<ushort, byte>(ref MemoryMarshal.GetReference(state.lens.AsSpan())), (uint)(state.lens.Length * sizeof(ushort)));
+        netUnsafe.CopyBlock(ref netUnsafe.As<ushort, byte>(ref MemoryMarshal.GetReference(copy.lens.AsSpan())),
+            ref netUnsafe.As<ushort, byte>(ref MemoryMarshal.GetReference(state.lens.AsSpan())), (uint)(state.lens.Length * sizeof(ushort)));
 
-        Unsafe.CopyBlock(ref Unsafe.As<ushort, byte>(ref MemoryMarshal.GetReference(copy.work.AsSpan())),
-            ref Unsafe.As<ushort, byte>(ref MemoryMarshal.GetReference(state.work.AsSpan())), (uint)(state.work.Length * sizeof(ushort)));
+        netUnsafe.CopyBlock(ref netUnsafe.As<ushort, byte>(ref MemoryMarshal.GetReference(copy.work.AsSpan())),
+            ref netUnsafe.As<ushort, byte>(ref MemoryMarshal.GetReference(state.work.AsSpan())), (uint)(state.work.Length * sizeof(ushort)));
 
-        Unsafe.CopyBlock(ref Unsafe.As<Code, byte>(ref MemoryMarshal.GetReference(copy.codes.AsSpan())),
-            ref Unsafe.As<Code, byte>(ref MemoryMarshal.GetReference(state.codes.AsSpan())), (uint)(state.codes.Length * Code.Size));
+        netUnsafe.CopyBlock(ref netUnsafe.As<Code, byte>(ref MemoryMarshal.GetReference(copy.codes.AsSpan())),
+            ref netUnsafe.As<Code, byte>(ref MemoryMarshal.GetReference(state.codes.AsSpan())), (uint)(state.codes.Length * Code.Size));
 
         if (state.lencode == s_lenfix)
             copy.lencode = s_lenfix;
@@ -109,7 +108,7 @@ internal static partial class Inflater
         copy.diststart = state.diststart;
 
         if (window != default)
-            Unsafe.CopyBlock(ref MemoryMarshal.GetReference(window.AsSpan()),
+            netUnsafe.CopyBlock(ref MemoryMarshal.GetReference(window.AsSpan()),
                 ref MemoryMarshal.GetReference(state.window.AsSpan()), (uint)wsize);
 
         copy.window = window;

@@ -2,7 +2,6 @@
 // Managed C#/.NET code Copyright (C) 2022 Magnus Montin
 
 using System;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace ZLibDotNet.Inflate;
@@ -31,8 +30,8 @@ internal static partial class Inflater
         ref byte window = ref MemoryMarshal.GetReference(state.window.AsSpan());
         ref Code lcode = ref MemoryMarshal.GetReference(state.lencode.AsSpan());
         ref Code dcode = ref MemoryMarshal.GetReference(state.distcode.AsSpan((int)state.diststart));
-        ref byte from = ref Unsafe.NullRef<byte>(); // where to copy match from
-        ref Code here = ref Unsafe.NullRef<Code>(); // retrieved table entry
+        ref byte from = ref netUnsafe.NullRef<byte>(); // where to copy match from
+        ref Code here = ref netUnsafe.NullRef<Code>(); // retrieved table entry
 
         // decode literals and length/distances until end-of-block or not enough  input data or output space            
         do

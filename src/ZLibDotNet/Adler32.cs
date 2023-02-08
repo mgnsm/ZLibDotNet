@@ -1,8 +1,6 @@
 ﻿// Original code and comments Copyright (C) 1995-2011, 2016 Mark Adler
 // Managed C#/.NET code Copyright (C) 2022 Magnus Montin
 
-using System.Runtime.CompilerServices;
-
 namespace ZLibDotNet;
 
 internal static class Adler32
@@ -31,7 +29,7 @@ internal static class Adler32
         }
 
         // initial Adler-32 value (deferred check for len == 1 speed)
-        if (Unsafe.IsNullRef(ref buf))
+        if (netUnsafe.IsNullRef(ref buf))
             return 1U;
 
         // in case short lengths are provided, keep it somewhat fast

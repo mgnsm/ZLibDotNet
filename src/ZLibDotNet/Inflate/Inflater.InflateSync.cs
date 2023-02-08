@@ -2,7 +2,6 @@
 // Managed C#/.NET code Copyright (C) 2022 Magnus Montin
 
 using System;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace ZLibDotNet.Inflate;

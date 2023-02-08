@@ -2,7 +2,6 @@
 // Managed C#/.NET code Copyright (C) 2022 Magnus Montin
 
 using System;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace ZLibDotNet.Inflate;
@@ -113,12 +112,12 @@ internal static partial class Inflater
 
         ref byte next = ref MemoryMarshal.GetReference(strm._input.AsSpan((int)strm.next_in)); // next input
         ref byte put = ref MemoryMarshal.GetReference(strm._output.AsSpan((int)strm.next_out)); // next output
-        ref byte from = ref Unsafe.NullRef<byte>(); // where to copy match bytes from
+        ref byte from = ref netUnsafe.NullRef<byte>(); // where to copy match bytes from
         ref Code codes = ref MemoryMarshal.GetReference(state.codes.AsSpan());
         ref ushort lens = ref MemoryMarshal.GetReference(state.lens.AsSpan());
         ref ushort work = ref MemoryMarshal.GetReference(state.work.AsSpan());
         ref byte window = ref MemoryMarshal.GetReference(state.window.AsSpan());
-        ref Code lencode = ref Unsafe.NullRef<Code>();
+        ref Code lencode = ref netUnsafe.NullRef<Code>();
         ref ushort order = ref MemoryMarshal.GetReference(s_order.AsSpan());
         uint have = strm.avail_in;          // available input
         uint left = strm.avail_out;         // ...and output
@@ -179,7 +178,7 @@ internal static partial class Inflater
                     state.dmax = (uint)(1 << (int)len);
                     state.flags = 0; // indicate zlib header
                     Trace.Tracev("inflate:   zlib header ok\n");
-                    strm.Adler = state.check = Adler32.Update(0, ref Unsafe.NullRef<byte>(), 0);
+                    strm.Adler = state.check = Adler32.Update(0, ref netUnsafe.NullRef<byte>(), 0);
                     state.mode = (hold & 0x200) != 0 ? InflateMode.DictId : InflateMode.Type;
                     hold = 0;
                     bits = 0;
@@ -211,7 +210,7 @@ internal static partial class Inflater
                         strm.inflateState.bits = bits;
                         return Z_NEED_DICT;
                     }
-                    strm.Adler = state.check = Adler32.Update(0, ref Unsafe.NullRef<byte>(), 0);
+                    strm.Adler = state.check = Adler32.Update(0, ref netUnsafe.NullRef<byte>(), 0);
                     state.mode = InflateMode.Type;
                     goto case InflateMode.Type;
                 case InflateMode.Type:
@@ -312,7 +311,7 @@ internal static partial class Inflater
                             copy = left;
                         if (copy == 0)
                             goto inf_leave;
-                        Unsafe.CopyBlockUnaligned(ref put, ref next, copy);
+                        netUnsafe.CopyBlockUnaligned(ref put, ref next, copy);
                         have -= copy;
                         next = ref Unsafe.Add(ref next, copy);
                         next_in += copy;
