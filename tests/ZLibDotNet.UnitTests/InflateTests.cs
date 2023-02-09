@@ -47,7 +47,7 @@ public class InflateTests
         };
 
         ZLib zlib = new();
-        Assert.AreEqual(Z_OK, zlib.InflateInit(zStream));
+        Assert.AreEqual(Z_OK, zlib.InflateInit(ref zStream));
         Assert.AreEqual(1U, zStream.Adler);
 
         int count = 0;
@@ -55,7 +55,7 @@ public class InflateTests
         {
             count++;
             zStream.AvailableIn = zStream.AvailableOut = 1; // force small buffers
-            int err = zlib.Inflate(zStream, Z_NO_FLUSH);
+            int err = zlib.Inflate(ref zStream, Z_NO_FLUSH);
             if (err == Z_STREAM_END)
                 break;
             Assert.AreEqual(Z_OK, err);
@@ -71,7 +71,7 @@ public class InflateTests
         Assert.AreEqual(19, zStream.NextIn);
         Assert.AreEqual(14, zStream.NextOut);
 
-        Assert.AreEqual(Z_OK, zlib.InflateEnd(zStream));
+        Assert.AreEqual(Z_OK, zlib.InflateEnd(ref zStream));
         Assert.AreEqual(0, zStream.AvailableIn);
         Assert.AreEqual(19, zStream.TotalIn);
         Assert.AreEqual(1, zStream.AvailableOut);
@@ -96,7 +96,7 @@ public class InflateTests
         };
 
         ZLib zlib = new();
-        Assert.AreEqual(Z_OK, zlib.InflateInit(zStream));
+        Assert.AreEqual(Z_OK, zlib.InflateInit(ref zStream));
 
         byte[] uncompr = new byte[ComprLen];
         Array.Copy(s_garbage, uncompr, s_garbage.Length);
@@ -106,7 +106,7 @@ public class InflateTests
             count++;
             zStream.Output = uncompr; // discard the output
             zStream.AvailableOut = ComprLen;
-            int err = zlib.Inflate(zStream, Z_NO_FLUSH);
+            int err = zlib.Inflate(ref zStream, Z_NO_FLUSH);
             if (err == Z_STREAM_END)
                 break;
             Assert.AreEqual(Z_OK, err, "large inflate");
@@ -121,7 +121,7 @@ public class InflateTests
         Assert.IsNull(zStream.Message);
         Assert.AreEqual(20288, zStream.NextIn);
 
-        Assert.AreEqual(Z_OK, zlib.InflateEnd(zStream));
+        Assert.AreEqual(Z_OK, zlib.InflateEnd(ref zStream));
         Assert.AreEqual(zStream.TotalOut, 2 * ComprLen + ComprLen / 2);
     }
 
@@ -138,7 +138,7 @@ public class InflateTests
         };
 
         ZLib zlib = new();
-        Assert.AreEqual(Z_OK, zlib.InflateInit(zStream));
+        Assert.AreEqual(Z_OK, zlib.InflateInit(ref zStream));
 
         const int UncomprLen = ComprLen;
         byte[] uncompr = new byte[UncomprLen];
@@ -147,7 +147,7 @@ public class InflateTests
         zStream.Output = uncompr;
         zStream.AvailableOut = UncomprLen;
 
-        Assert.AreEqual(Z_OK, zlib.Inflate(zStream, Z_NO_FLUSH));
+        Assert.AreEqual(Z_OK, zlib.Inflate(ref zStream, Z_NO_FLUSH));
         Assert.AreEqual(0, zStream.AvailableIn);
         Assert.AreEqual(2, zStream.TotalIn);
         Assert.AreEqual(40000, zStream.AvailableOut);
@@ -159,7 +159,7 @@ public class InflateTests
         Assert.AreEqual(0, zStream.NextOut);
 
         zStream.AvailableIn = 28 - 2; // read all compressed data
-        Assert.AreEqual(Z_OK, zlib.InflateSync(zStream));  // but skip the damaged part
+        Assert.AreEqual(Z_OK, zlib.InflateSync(ref zStream));  // but skip the damaged part
         Assert.AreEqual(17, zStream.AvailableIn);
         Assert.AreEqual(11, zStream.TotalIn);
         Assert.AreEqual(40000, zStream.AvailableOut);
@@ -170,7 +170,7 @@ public class InflateTests
         Assert.AreEqual(11, zStream.NextIn);
         Assert.AreEqual(0, zStream.NextOut);
 
-        Assert.AreEqual(Z_STREAM_END, zlib.Inflate(zStream, Z_FINISH), $"inflate should report {Z_STREAM_END}");
+        Assert.AreEqual(Z_STREAM_END, zlib.Inflate(ref zStream, Z_FINISH), $"inflate should report {Z_STREAM_END}");
         Assert.AreEqual(0, zStream.AvailableIn);
         Assert.AreEqual(28, zStream.TotalIn);
         Assert.AreEqual(39989, zStream.AvailableOut);
@@ -183,7 +183,7 @@ public class InflateTests
         Assert.IsTrue(Enumerable.SequenceEqual(uncompr.Take(11),
             new byte[11] { 108, 111, 44, 32, 104, 101, 108, 108, 111, 33, 0 }));
 
-        Assert.AreEqual(Z_OK, zlib.InflateEnd(zStream));
+        Assert.AreEqual(Z_OK, zlib.InflateEnd(ref zStream));
     }
 
     [TestMethod]
@@ -197,7 +197,7 @@ public class InflateTests
         zStream.AvailableIn = compr.Length;
 
         ZLib zlib = new();
-        Assert.AreEqual(Z_OK, zlib.InflateInit(zStream));
+        Assert.AreEqual(Z_OK, zlib.InflateInit(ref zStream));
 
         byte[] uncompr = new byte[ComprLen];
         Array.Copy(s_garbage, uncompr, s_garbage.Length);
@@ -208,13 +208,13 @@ public class InflateTests
         byte[] dictionary = Encoding.UTF8.GetBytes($"hello{char.MinValue}");
         for (; ; )
         {
-            int err = zlib.Inflate(zStream, Z_NO_FLUSH);
+            int err = zlib.Inflate(ref zStream, Z_NO_FLUSH);
             if (err == Z_STREAM_END)
                 break;
             if (err == Z_NEED_DICT)
             {
                 Assert.AreEqual(138478101U, zStream.Adler, "unexpected dictionary");
-                err = zlib.InflateSetDictionary(zStream, dictionary);
+                err = zlib.InflateSetDictionary(ref zStream, dictionary);
             }
             Assert.AreEqual(Z_OK, err, "inflate with dict");
         }
@@ -226,11 +226,11 @@ public class InflateTests
         Assert.AreEqual(64, zStream.DataType);
         Assert.IsNull(zStream.Message);
 
-        Assert.AreEqual(Z_OK, zlib.InflateEnd(zStream));
+        Assert.AreEqual(Z_OK, zlib.InflateEnd(ref zStream));
 
         Assert.IsTrue(Enumerable.SequenceEqual(uncompr.TakeWhile(b => b != 0), s_hello), "bad inflate with dict");
 
-        Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateSetDictionary(zStream, default));
+        Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateSetDictionary(ref zStream, default));
     }
 
     [TestMethod]
@@ -238,7 +238,7 @@ public class InflateTests
     {
         ZLib zlib = new();
         ZStream zStream = new();
-        Assert.AreEqual(Z_OK, zlib.InflateInit(zStream));
+        Assert.AreEqual(Z_OK, zlib.InflateInit(ref zStream));
 
         zStream.Input = new byte[20] { 120, 156, 203, 72, 205, 201, 201, 215, 81, 200, 0, 81, 138, 12, 0, 38, 6, 4, 150, 0 };
         zStream.AvailableIn = zStream.Input.Length;
@@ -248,13 +248,13 @@ public class InflateTests
         int outputBufferSize = ouputBuffer.Length - 1;
         zStream.AvailableOut = outputBufferSize;
 
-        Assert.AreEqual(Z_BUF_ERROR, zlib.Inflate(zStream, Z_FINISH));
+        Assert.AreEqual(Z_BUF_ERROR, zlib.Inflate(ref zStream, Z_FINISH));
         Assert.AreEqual(outputBufferSize, zStream.TotalOut);
         Assert.AreEqual(0, zStream.AvailableOut);
 
         zStream.AvailableOut++;
-        Assert.AreEqual(Z_STREAM_END, zlib.Inflate(zStream, Z_FINISH));
-        Assert.AreEqual(Z_OK, zlib.InflateEnd(zStream));
+        Assert.AreEqual(Z_STREAM_END, zlib.Inflate(ref zStream, Z_FINISH));
+        Assert.AreEqual(Z_OK, zlib.InflateEnd(ref zStream));
     }
 
     [TestMethod]
@@ -262,7 +262,7 @@ public class InflateTests
     {
         ZLib zlib = new();
         ZStream zStream = new();
-        Assert.AreEqual(Z_OK, zlib.InflateInit(zStream));
+        Assert.AreEqual(Z_OK, zlib.InflateInit(ref zStream));
 
         byte[] inputBuffer = new byte[9] { 0, 0, 120, 156, 203, 72, 205, 201, 201 };
         const int InputOffset = 2;
@@ -276,7 +276,7 @@ public class InflateTests
         zStream.AvailableOut = outputBuffer.Length - OutputOffset;
         zStream.NextOut = OutputOffset;
 
-        Assert.AreEqual(Z_OK, zlib.Inflate(zStream, Z_NO_FLUSH));
+        Assert.AreEqual(Z_OK, zlib.Inflate(ref zStream, Z_NO_FLUSH));
 
         for (int i = 0; i < OutputOffset; i++)
             Assert.AreEqual(default, outputBuffer[i]);
@@ -292,7 +292,7 @@ public class InflateTests
 
         ZLib zlib = new();
         ZStream zStream = new();
-        Assert.AreEqual(Z_OK, zlib.InflateInit(zStream));
+        Assert.AreEqual(Z_OK, zlib.InflateInit(ref zStream));
 
         const int SourceSize = 60_000;
         byte[] sourceBuffer = new byte[SourceSize];
@@ -314,7 +314,7 @@ public class InflateTests
             {
                 zStream.Output = @out;
                 zStream.AvailableOut = ChunkSize;
-                ret = zlib.Inflate(zStream, Z_NO_FLUSH);
+                ret = zlib.Inflate(ref zStream, Z_NO_FLUSH);
                 Assert.AreNotEqual(Z_STREAM_ERROR, ret); // state not clobbered
                 switch (ret)
                 {
@@ -323,7 +323,7 @@ public class InflateTests
                         goto case Z_DATA_ERROR;
                     case Z_DATA_ERROR:
                     case Z_MEM_ERROR:
-                        _ = zlib.InflateEnd(zStream);
+                        _ = zlib.InflateEnd(ref zStream);
                         Assert.Fail($"{ret}");
                         return;
                 }
@@ -334,7 +334,7 @@ public class InflateTests
         } while (ret != Z_STREAM_END);
 
         // clean up
-        _ = zlib.InflateEnd(zStream);
+        _ = zlib.InflateEnd(ref zStream);
         Assert.AreEqual(Z_STREAM_END, ret);
         Assert.IsTrue(Enumerable.SequenceEqual(sourceBuffer, dest.ToArray()));
     }
@@ -350,9 +350,9 @@ public class InflateTests
             Input = compr,
             Output = uncompr
         };
-        Assert.AreEqual(Z_OK, zlib.InflateInit(zStream, -15));
-        Assert.AreEqual(Z_STREAM_END, zlib.Inflate(zStream, Z_FINISH));
-        Assert.AreEqual(Z_OK, zlib.InflateEnd(zStream));
+        Assert.AreEqual(Z_OK, zlib.InflateInit(ref zStream, -15));
+        Assert.AreEqual(Z_STREAM_END, zlib.Inflate(ref zStream, Z_FINISH));
+        Assert.AreEqual(Z_OK, zlib.InflateEnd(ref zStream));
         Assert.AreEqual(13, zStream.TotalOut);
 
         Assert.IsTrue(Enumerable.SequenceEqual(uncompr, s_hello));
@@ -363,27 +363,28 @@ public class InflateTests
     {
         ZLib zlib = new();
         ZStream zStream = new();
-        Assert.AreEqual(Z_OK, zlib.InflateInit(zStream));
-        Assert.AreEqual(Z_OK, zlib.InflatePrime(zStream, 5, 31));
-        Assert.AreEqual(Z_OK, zlib.InflatePrime(zStream, -1, 0));
-        Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateSetDictionary(zStream, null));
-        Assert.AreEqual(Z_OK, zlib.InflateEnd(zStream));
+        Assert.AreEqual(Z_OK, zlib.InflateInit(ref zStream));
+        Assert.AreEqual(Z_OK, zlib.InflatePrime(ref zStream, 5, 31));
+        Assert.AreEqual(Z_OK, zlib.InflatePrime(ref zStream, -1, 0));
+        Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateSetDictionary(ref zStream, null));
+        Assert.AreEqual(Z_OK, zlib.InflateEnd(ref zStream));
 
         Inf("63 0\0", 0, -15, 1, Z_OK); // force window allocation
         Inf("63 18 5\0", 0, -8, 259, Z_OK); // force window replacement
         Inf("63 18 68 30 d0 0 0\0", 4, -8, 259, Z_OK); // force split window update
         Inf("3 0\0", 0, -15, 1, Z_STREAM_END); // use fixed blocks
-        Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateInit(zStream, 1)); // bad window size
+        Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateInit(ref zStream, 1)); // bad window size
     }
 
     [TestMethod]
     public void CoverWrap()
     {
         ZLib zlib = new();
-        Assert.AreEqual(Z_STREAM_ERROR, zlib.Inflate(default, default));
-        Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateEnd(default));
-        Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateCopy(default, default));
-        Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateInit(new ZStream(), 31));
+        ZStream zStream = new();
+        Assert.AreEqual(Z_STREAM_ERROR, zlib.Inflate(ref zStream, default));
+        Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateEnd(ref zStream));
+        Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateCopy(ref zStream, ref zStream));
+        Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateInit(ref zStream, 31));
 
         // A pointer to an empty array == null:
         // len = 0 => @out == new byte[0] in Inf => strm.next_out == null in Inflater.Inflate => Z_STREAM_ERROR
@@ -394,23 +395,22 @@ public class InflateTests
         Inf("8 b8 0 0 0 1\0", 0, 8, 1, Z_NEED_DICT); // need dictionary
         Inf("78 9c 63 0\0", 0, 15, 1, Z_OK); // compute adler32
 
-        ZStream zStream = new();
-        Assert.AreEqual(Z_OK, zlib.InflateInit(zStream, -8));
+        Assert.AreEqual(Z_OK, zlib.InflateInit(ref zStream, -8));
 
-        Assert.AreEqual(Z_OK, zlib.InflateSetDictionary(zStream, new byte[257]));
+        Assert.AreEqual(Z_OK, zlib.InflateSetDictionary(ref zStream, new byte[257]));
 
         zStream.Input = new byte[2] { 99, 0 };
         zStream.Output = new byte[1];
-        Assert.AreEqual(Z_OK, zlib.InflatePrime(zStream, 16, 0));
+        Assert.AreEqual(Z_OK, zlib.InflatePrime(ref zStream, 16, 0));
 
         zStream.Input = new byte[2] { 128, 0 };
-        Assert.AreEqual(Z_DATA_ERROR, zlib.InflateSync(zStream));
-        Assert.AreEqual(Z_STREAM_ERROR, zlib.Inflate(zStream, Z_NO_FLUSH));
+        Assert.AreEqual(Z_DATA_ERROR, zlib.InflateSync(ref zStream));
+        Assert.AreEqual(Z_STREAM_ERROR, zlib.Inflate(ref zStream, Z_NO_FLUSH));
 
         zStream.Input = new byte[4] { 0, 0, 255, 255 };
-        Assert.AreEqual(Z_OK, zlib.InflateSync(zStream));
+        Assert.AreEqual(Z_OK, zlib.InflateSync(ref zStream));
 
-        Assert.AreEqual(Z_OK, zlib.InflateEnd(zStream));
+        Assert.AreEqual(Z_OK, zlib.InflateEnd(ref zStream));
     }
 
     [TestMethod]
@@ -484,7 +484,7 @@ public class InflateTests
         ZLib zlib = new();
         ZStream strm = new();
         ZStream copy = new();
-        Assert.AreEqual(Z_OK, zlib.InflateInit(strm, win));
+        Assert.AreEqual(Z_OK, zlib.InflateInit(ref strm, win));
 
         byte[] @out = new byte[len];
         int have = default;
@@ -499,26 +499,26 @@ public class InflateTests
         {
             strm.Output = @out;
             strm.AvailableOut = (int)len;
-            int ret = zlib.Inflate(strm, Z_NO_FLUSH);
+            int ret = zlib.Inflate(ref strm, Z_NO_FLUSH);
             Assert.IsTrue(err == 9 || ret == err);
             if (ret != Z_OK && ret != Z_BUF_ERROR && ret != Z_NEED_DICT)
                 break;
             if (ret == Z_NEED_DICT)
             {
-                Assert.AreEqual(Z_DATA_ERROR, zlib.InflateSetDictionary(strm, @in, 1));
+                Assert.AreEqual(Z_DATA_ERROR, zlib.InflateSetDictionary(ref strm, @in, 1));
                 strm.inflateState.mode = InflateMode.Dict;
-                Assert.AreEqual(Z_OK, zlib.InflateSetDictionary(strm, @out, 0));
-                Assert.AreEqual(Z_BUF_ERROR, zlib.Inflate(strm, Z_NO_FLUSH));
+                Assert.AreEqual(Z_OK, zlib.InflateSetDictionary(ref strm, @out, 0));
+                Assert.AreEqual(Z_BUF_ERROR, zlib.Inflate(ref strm, Z_NO_FLUSH));
             }
-            Assert.AreEqual(Z_OK, zlib.InflateCopy(strm, copy));
-            Assert.AreEqual(Z_OK, zlib.InflateEnd(copy));
+            Assert.AreEqual(Z_OK, zlib.InflateCopy(ref strm, ref copy));
+            Assert.AreEqual(Z_OK, zlib.InflateEnd(ref copy));
             err = 9; // don't care next time around
             have += strm.AvailableIn;
             strm.AvailableIn = step > have ? have : step;
             have -= strm.AvailableIn;
         } while (strm.AvailableIn > 0);
-        Assert.AreEqual(Z_OK, zlib.InflateReset(strm, -8));
-        Assert.AreEqual(Z_OK, zlib.InflateEnd(strm));
+        Assert.AreEqual(Z_OK, zlib.InflateReset(ref strm, -8));
+        Assert.AreEqual(Z_OK, zlib.InflateEnd(ref strm));
     }
 
     private static byte[] H2B(string hex, ref int len)
@@ -563,7 +563,7 @@ public class InflateTests
         // inflate
         ZLib zlib = new();
         ZStream strm = new();
-        Assert.AreEqual(Z_OK, zlib.InflateInit(strm, -15));
+        Assert.AreEqual(Z_OK, zlib.InflateInit(ref strm, -15));
         strm.Input = @in;
         strm.AvailableIn = len;
         int ret;
@@ -571,7 +571,7 @@ public class InflateTests
         {
             strm.Output = @out;
             strm.AvailableOut = size;
-            ret = zlib.Inflate(strm, Z_TREES);
+            ret = zlib.Inflate(ref strm, Z_TREES);
             Assert.IsTrue(ret != Z_STREAM_ERROR && ret != Z_MEM_ERROR);
             if (ret == Z_DATA_ERROR || ret == Z_NEED_DICT)
                 break;
@@ -581,6 +581,6 @@ public class InflateTests
             Assert.AreEqual(Z_DATA_ERROR, ret);
             Assert.AreEqual(id, strm.Message);
         }
-        Assert.AreEqual(Z_OK, zlib.InflateEnd(strm));
+        Assert.AreEqual(Z_OK, zlib.InflateEnd(ref strm));
     }
 }

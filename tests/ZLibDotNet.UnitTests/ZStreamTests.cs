@@ -10,11 +10,11 @@ public class ZStreamTests
     public void InitializeZStream()
     {
         ZStream zStream = new();
-        Assert.AreEqual(default, zStream.Input);
+        Assert.IsTrue(zStream.Input == default);
         Assert.AreEqual(default, zStream.NextIn);
         Assert.AreEqual(default, zStream.AvailableIn);
         Assert.AreEqual(default, zStream.TotalIn);
-        Assert.AreEqual(default, zStream.Output);
+        Assert.IsTrue(zStream.Output == default);
         Assert.AreEqual(default, zStream.NextOut);
         Assert.AreEqual(default, zStream.AvailableOut);
         Assert.AreEqual(default, zStream.TotalOut);
@@ -29,8 +29,8 @@ public class ZStreamTests
         ZStream zStream = new();
         byte[] buffer = new byte[10];
         zStream.Input = buffer;
-        Assert.AreEqual(buffer, zStream.Input); // Verify that the property was set.
-        Assert.AreEqual(default, zStream.Output);
+        Assert.IsTrue(zStream.Input == buffer); // Verify that the property was set.
+        Assert.IsTrue(zStream.Output == default);
         Assert.AreEqual(default, zStream.NextIn);
         Assert.AreEqual(buffer.Length, zStream.AvailableIn); // Verify that the AvailableIn property was set to the length of the buffer.
 
@@ -111,7 +111,7 @@ public class ZStreamTests
         // Ensure that the NextIn and AvailableIn properties are reset when re-setting the Input property.
         buffer = new byte[11];
         zStream.Input = buffer;
-        Assert.AreEqual(buffer, zStream.Input);
+        Assert.IsTrue(zStream.Input == buffer);
         Assert.AreEqual(default, zStream.NextIn);
         Assert.AreEqual(buffer.Length, zStream.AvailableIn);
     }
@@ -122,8 +122,8 @@ public class ZStreamTests
         ZStream zStream = new();
         byte[] buffer = new byte[11];
         zStream.Output = buffer;
-        Assert.AreEqual(buffer, zStream.Output); // Verify that the property was set.
-        Assert.AreEqual(default, zStream.Input);
+        Assert.IsTrue(zStream.Output == buffer); // Verify that the property was set.
+        Assert.IsTrue(zStream.Input == default);
         Assert.AreEqual(default, zStream.NextOut);
         Assert.AreEqual(buffer.Length, zStream.AvailableOut); // Verify that the AvailableOut property was set to the length of the buffer.
 
@@ -204,7 +204,7 @@ public class ZStreamTests
         // Ensure that the NextOut and AvailableOut properties are reset when re-setting the Output property.
         buffer = new byte[12];
         zStream.Output = buffer;
-        Assert.AreEqual(buffer, zStream.Output);
+        Assert.IsTrue(zStream.Output == buffer);
         Assert.AreEqual(default, zStream.NextOut);
         Assert.AreEqual(buffer.Length, zStream.AvailableOut);
     }

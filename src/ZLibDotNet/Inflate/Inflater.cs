@@ -99,9 +99,9 @@ internal static partial class Inflater
     // permutation of code lengths
     private static readonly ushort[] s_order = new ushort[19] { 16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15 };
 
-    internal static int Inflate(ZStream strm, int flush)
+    internal static int Inflate(ref ZStream strm, int flush)
     {
-        if (InflateStateCheck(strm)
+        if (InflateStateCheck(ref strm)
             || strm._output == null
             || strm._input == null && strm.avail_in != 0)
             return Z_STREAM_ERROR;
@@ -110,8 +110,8 @@ internal static partial class Inflater
         if (state.mode == InflateMode.Type) // Skip check
             state.mode = InflateMode.Typedo;
 
-        ref byte next = ref MemoryMarshal.GetReference(strm._input.AsSpan((int)strm.next_in)); // next input
-        ref byte put = ref MemoryMarshal.GetReference(strm._output.AsSpan((int)strm.next_out)); // next output
+        ref byte next = ref MemoryMarshal.GetReference(strm._input.Slice((int)strm.next_in)); // next input
+        ref byte put = ref MemoryMarshal.GetReference(strm._output.Slice((int)strm.next_out)); // next output
         ref byte from = ref netUnsafe.NullRef<byte>(); // where to copy match bytes from
         ref Code codes = ref MemoryMarshal.GetReference(state.codes.AsSpan());
         ref ushort lens = ref MemoryMarshal.GetReference(state.lens.AsSpan());
@@ -537,11 +537,11 @@ internal static partial class Inflater
                         strm.avail_in = have;
                         strm.inflateState.hold = hold;
                         strm.inflateState.bits = bits;
-                        InflateFast(strm, @out);
-                        put = ref MemoryMarshal.GetReference(strm._output.AsSpan((int)strm.next_out));
+                        InflateFast(ref strm, @out);
+                        put = ref MemoryMarshal.GetReference(strm._output.Slice((int)strm.next_out));
                         next_out = strm.next_out;
                         left = strm.avail_out;
-                        next = ref MemoryMarshal.GetReference(strm._input.AsSpan((int)strm.next_in));
+                        next = ref MemoryMarshal.GetReference(strm._input.Slice((int)strm.next_in));
                         next_in = strm.next_in;
                         have = strm.avail_in;
                         hold = strm.inflateState.hold;
@@ -814,7 +814,7 @@ internal static partial class Inflater
         {
             try
             {
-                UpdateWindow(strm, ref put, @out - strm.avail_out);
+                UpdateWindow(ref strm, ref put, @out - strm.avail_out);
             }
             catch (OutOfMemoryException)
             {
@@ -838,9 +838,9 @@ internal static partial class Inflater
         return ret;
     }
 
-    private static bool InflateStateCheck(ZStream strm) =>
-        strm == null || strm.inflateState == null || strm.inflateState.strm != strm
-            || strm.inflateState.mode < InflateMode.Head || strm.inflateState.mode > InflateMode.Sync;
+    private static bool InflateStateCheck(ref ZStream strm) =>
+        strm.inflateState == null || strm.inflateState.mode < InflateMode.Head
+        || strm.inflateState.mode > InflateMode.Sync;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static uint ZSwap32(uint q) => (((q) >> 24) & 0xff) + (((q) >> 8) & 0xff00)

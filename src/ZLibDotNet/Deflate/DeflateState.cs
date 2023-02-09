@@ -6,13 +6,12 @@ using static ZLibDotNet.Deflate.Constants;
 namespace ZLibDotNet.Deflate;
 
 /// <summary>
-/// State maintained between <see cref="ZLib.Deflate(ZStream, int)"/> calls.
+/// State maintained between <see cref="ZLib.Deflate(ref ZStream, int)"/> calls.
 /// </summary>
 internal class DeflateState
 {
     internal uint pendingOutOffset;
 
-    internal ZStream strm;          // pointer back to this zlib stream
     internal int status;            // as the name implies
     internal byte[] pending_buf;    // output still pending
 

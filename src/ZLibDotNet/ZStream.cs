@@ -10,10 +10,10 @@ namespace ZLibDotNet;
 /// Represents a stream of data that can be compressed and uncompressed using the zlib data format.
 /// </summary>
 #pragma warning disable CA1711
-public sealed class ZStream
+public ref struct ZStream
 #pragma warning restore CA1711
 {
-    internal uint next_in;       // the index of next input byte in the input buffer
+    internal uint next_in;      // the index of next input byte in the input buffer
     internal uint avail_in;     // number of bytes available at next_in
     internal uint total_in;     // total number of input bytes read so far
 
@@ -22,28 +22,27 @@ public sealed class ZStream
     internal uint total_out;    // total number of bytes output so far
 
     internal string msg;        // last error message
+
     internal InflateState inflateState;
     internal DeflateState deflateState;
 
     internal int data_type;     // best guess about the data type: binary or text for deflate, or the decoding state for inflate
 
-    internal byte[] _input;
-    internal byte[] _output;
+    internal ReadOnlySpan<byte> _input;
+    internal Span<byte> _output;
 
     /// <summary>
     /// Gets or sets the input buffer.
     /// </summary>
     /// <remarks>Setting the <see cref="Input"/> property resets the <see cref="AvailableIn"/> and <see cref="NextIn"/> properties to their default values.</remarks>
-#pragma warning disable CA1819
-    public byte[] Input
-#pragma warning restore CA1819
+    public ReadOnlySpan<byte> Input
     {
         get => _input;
         set
         {
             _input = value;
             next_in = default;
-            AvailableIn = value?.Length ?? default;
+            avail_in = (uint)value.Length;
         }
     }
 
@@ -90,7 +89,7 @@ public sealed class ZStream
     /// </summary>
     /// <remarks>Setting the <see cref="Output"/> property resets the <see cref="AvailableOut"/> and <see cref="NextOut"/> properties to their default values.</remarks>
 #pragma warning disable CA1819
-    public byte[] Output
+    public Span<byte> Output
 #pragma warning restore CA1819
     {
         get => _output;
@@ -98,7 +97,7 @@ public sealed class ZStream
         {
             _output = value;
             next_out = default;
-            AvailableOut = value?.Length ?? default;
+            avail_out = (uint)value.Length;
         }
     }
 
@@ -155,20 +154,19 @@ public sealed class ZStream
     /// </summary>
     public uint Adler { get; internal set; }
 
-    private static void ValidateAvailableBytes(int value, uint offset, byte[] buffer, string bufferName, string offsetPropertyName)
+    private static void ValidateAvailableBytes(int value, uint offset, ReadOnlySpan<byte> buffer, string bufferName, string offsetPropertyName)
     {
-        if (value < 0 || value > (buffer?.Length ?? 0) - offset)
+        if (value < 0 || value > buffer.Length - offset)
             throw new ArgumentOutOfRangeException(nameof(value),
                 $"Value was out of range. Must be non-negative and less than or equal to the size of the {bufferName} buffer minus the value of the {offsetPropertyName} property.");
     }
 
-    private static void ValidateOffset(int value, int availableBytes, byte[] buffer, string bufferName)
+    private static void ValidateOffset(int value, int availableBytes, ReadOnlySpan<byte> buffer, string bufferName)
     {
-        int bufferLength = buffer?.Length ?? 0;
-        if (value < 0 || value >= bufferLength)
+        if (value < 0 || value >= buffer.Length)
             throw new ArgumentOutOfRangeException(nameof(value),
                 $"Value was out of range. Must be non-negative and less than the size of the {bufferName} buffer.");
-        if (bufferLength - value < availableBytes)
+        if (buffer.Length - value < availableBytes)
             throw new ArgumentOutOfRangeException(nameof(value),
                 $"The value must refer to a location within the available bytes of the {bufferName} buffer.");
     }

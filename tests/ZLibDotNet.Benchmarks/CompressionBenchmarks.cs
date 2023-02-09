@@ -40,9 +40,9 @@ public class CompressionBenchmarks
             Input = input,
             Output = outputBuffer
         };
-        _ = s_zlib.DeflateInit(zStream, Level);
-        _ = s_zlib.Deflate(zStream, Z_FINISH);
-        _ = s_zlib.DeflateEnd(zStream);
+        _ = s_zlib.DeflateInit(ref zStream, Level);
+        _ = s_zlib.Deflate(ref zStream, Z_FINISH);
+        _ = s_zlib.DeflateEnd(ref zStream);
 
         ArrayPool<byte>.Shared.Return(outputBuffer);
     }

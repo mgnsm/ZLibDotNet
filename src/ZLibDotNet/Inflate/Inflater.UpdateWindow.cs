@@ -9,7 +9,7 @@ namespace ZLibDotNet.Inflate;
 
 internal static partial class Inflater
 {
-    private static void UpdateWindow(ZStream strm, ref byte end, uint copy)
+    private static void UpdateWindow(ref ZStream strm, ref byte end, uint copy)
     {
         InflateState state = strm.inflateState;
 

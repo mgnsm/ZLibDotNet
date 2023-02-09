@@ -36,9 +36,9 @@ public class UncompressionBenchmarks
             Input = input,
             Output = outputBuffer
         };
-        _ = s_zlib.InflateInit(zStream);
-        _ = s_zlib.Inflate(zStream, Z_NO_FLUSH);
-        _ = s_zlib.InflateEnd(zStream);
+        _ = s_zlib.InflateInit(ref zStream);
+        _ = s_zlib.Inflate(ref zStream, Z_NO_FLUSH);
+        _ = s_zlib.InflateEnd(ref zStream);
 
         ArrayPool<byte>.Shared.Return(outputBuffer);
     }

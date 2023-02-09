@@ -7,21 +7,21 @@ namespace ZLibDotNet.Inflate;
 
 internal static partial class Inflater
 {
-    internal static int InflateReset(ZStream strm)
+    internal static int InflateReset(ref ZStream strm)
     {
-        if (InflateStateCheck(strm))
+        if (InflateStateCheck(ref strm))
             return Z_STREAM_ERROR;
 
         InflateState state = strm.inflateState;
         state.wsize = 0;
         state.whave = 0;
         state.wnext = 0;
-        return InflateResetKeep(strm);
+        return InflateResetKeep(ref strm);
     }
 
-    internal static int InflateReset(ZStream strm, int windowBits)
+    internal static int InflateReset(ref ZStream strm, int windowBits)
     {
-        if (InflateStateCheck(strm))
+        if (InflateStateCheck(ref strm))
             return Z_STREAM_ERROR;
 
         InflateState state = strm.inflateState;
@@ -51,12 +51,12 @@ internal static partial class Inflater
         // update state and reset the rest of it
         state.wrap = wrap;
         state.wbits = (uint)windowBits;
-        return InflateReset(strm);
+        return InflateReset(ref strm);
     }
 
-    internal static int InflateResetKeep(ZStream strm)
+    internal static int InflateResetKeep(ref ZStream strm)
     {
-        if (InflateStateCheck(strm))
+        if (InflateStateCheck(ref strm))
             return Z_STREAM_ERROR;
 
         InflateState state = strm.inflateState;

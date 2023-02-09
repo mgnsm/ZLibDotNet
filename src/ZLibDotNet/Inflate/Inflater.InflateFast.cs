@@ -8,7 +8,7 @@ namespace ZLibDotNet.Inflate;
 
 internal static partial class Inflater
 {
-    private static void InflateFast(ZStream strm, uint start)
+    private static void InflateFast(ref ZStream strm, uint start)
     {
         InflateState state = strm.inflateState;
         uint last = strm.next_in + (strm.avail_in - 5);      // have enough input while in < last
@@ -25,8 +25,8 @@ internal static partial class Inflater
         uint len;   // match length, unused bytes
         uint dist;  // match distance
 
-        ref byte @in = ref MemoryMarshal.GetReference(strm._input.AsSpan((int)strm.next_in));
-        ref byte @out = ref MemoryMarshal.GetReference(strm._output.AsSpan((int)strm.next_out));
+        ref byte @in = ref MemoryMarshal.GetReference(strm._input.Slice((int)strm.next_in));
+        ref byte @out = ref MemoryMarshal.GetReference(strm._output.Slice((int)strm.next_out));
         ref byte window = ref MemoryMarshal.GetReference(state.window.AsSpan());
         ref Code lcode = ref MemoryMarshal.GetReference(state.lencode.AsSpan());
         ref Code dcode = ref MemoryMarshal.GetReference(state.distcode.AsSpan((int)state.diststart));

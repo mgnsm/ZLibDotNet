@@ -21,16 +21,16 @@ public class ExampleTests
             Input = s_inputData,
             Output = compressedData
         };
-        _ = zlib.DeflateInit(zStream, Z_DEFAULT_COMPRESSION);
-        _ = zlib.Deflate(zStream, Z_FULL_FLUSH);
-        _ = zlib.DeflateEnd(zStream);
+        _ = zlib.DeflateInit(ref zStream, Z_DEFAULT_COMPRESSION);
+        _ = zlib.Deflate(ref zStream, Z_FULL_FLUSH);
+        _ = zlib.DeflateEnd(ref zStream);
 
         // Uncompress
         byte[] uncomressedData = new byte[s_inputData.Length];
         zStream.Input = compressedData;
         zStream.Output = uncomressedData;
-        _ = zlib.InflateInit(zStream);
-        _ = zlib.Inflate(zStream, Z_SYNC_FLUSH);
+        _ = zlib.InflateInit(ref zStream);
+        _ = zlib.Inflate(ref zStream, Z_SYNC_FLUSH);
 
         Assert.IsTrue(Enumerable.SequenceEqual(s_inputData, uncomressedData));
     }

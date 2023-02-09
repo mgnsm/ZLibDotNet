@@ -7,9 +7,9 @@ namespace ZLibDotNet.Inflate;
 
 internal static partial class Inflater
 {
-    internal static int InflateSetDictionary(ZStream strm, ref byte dictionary, uint dictLength)
+    internal static int InflateSetDictionary(ref ZStream strm, ref byte dictionary, uint dictLength)
     {
-        if (InflateStateCheck(strm) || netUnsafe.IsNullRef(ref dictionary))
+        if (InflateStateCheck(ref strm) || netUnsafe.IsNullRef(ref dictionary))
             return Z_STREAM_ERROR;
 
         InflateState state = strm.inflateState;
@@ -28,7 +28,7 @@ internal static partial class Inflater
         // copy dictionary to window using updatewindow(), which will amend the existing dictionary if appropriate
         try
         {
-            UpdateWindow(strm, ref Unsafe.Add(ref dictionary, dictLength), dictLength);
+            UpdateWindow(ref strm, ref Unsafe.Add(ref dictionary, dictLength), dictLength);
         }
         catch (OutOfMemoryException)
         {

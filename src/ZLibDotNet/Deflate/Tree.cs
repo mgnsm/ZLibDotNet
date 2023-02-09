@@ -162,11 +162,12 @@ internal static class Tree
     /// <summary>
     /// Determines the best encoding for the current block: dynamic trees, static trees or store, and writes out the encoded block.
     /// </summary>
-    internal static void FlushBlock(DeflateState s, ref byte buf, uint stored_len, uint last,
+    internal static void FlushBlock(ref ZStream strm, ref byte buf, uint stored_len, uint last,
         ref byte pending_buf, ref TreeNode dyn_ltree, ref TreeNode dyn_dtree, ref TreeNode bl_tree,
         ref ushort bl_count, ref int heap, ref byte depth, ref ushort bl_order, ref byte dist_code,
         ref byte length_code, ref int base_dist, ref int base_length, ref int extra_dbits, ref int extra_lbits)
     {
+        DeflateState s = strm.deflateState;
         uint opt_lenb, static_lenb; // opt_len and static_len in bytes
         uint max_blindex = 0;  // index of last bit length code of non zero freq */
 
@@ -174,8 +175,8 @@ internal static class Tree
         if (s.level > 0)
         {
             // Check if the file is binary or text
-            if (s.strm.data_type == Z_UNKNOWN)
-                s.strm.data_type = DetectDataType(ref dyn_ltree);
+            if (strm.data_type == Z_UNKNOWN)
+                strm.data_type = DetectDataType(ref dyn_ltree);
 
             // Construct the literal and distance trees
             BuildTree(s, s.l_desc, ref bl_count, ref heap, ref depth);

@@ -8,9 +8,9 @@ namespace ZLibDotNet.Inflate;
 
 internal static partial class Inflater
 {
-    internal static int InflateSync(ZStream strm)
+    internal static int InflateSync(ref ZStream strm)
     {
-        if (InflateStateCheck(strm))
+        if (InflateStateCheck(ref strm))
             return Z_STREAM_ERROR;
         InflateState state = strm.inflateState;
         if (strm.avail_in == 0 && state.bits < 8)
@@ -38,7 +38,7 @@ internal static partial class Inflater
         }
 
         // search available input
-        uint @in = SyncSearch(ref state.have, ref MemoryMarshal.GetReference(strm._input.AsSpan((int)strm.next_in)), strm.avail_in);
+        uint @in = SyncSearch(ref state.have, ref MemoryMarshal.GetReference(strm._input.Slice((int)strm.next_in)), strm.avail_in);
         strm.avail_in -= @in;
         strm.next_in += @in;
         strm.total_in += @in;
@@ -57,7 +57,7 @@ internal static partial class Inflater
         uint @out; // temporary to total_out
         @in = strm.total_in;
         @out = strm.total_out;
-        _ = InflateReset(strm);
+        _ = InflateReset(ref strm);
         strm.total_in = @in;
         strm.total_out = @out;
         state.flags = flags;

@@ -282,3 +282,4 @@ dotnet_analyzer_diagnostic.severity = warning
 dotnet_diagnostic.IDE0010.severity = none
 dotnet_diagnostic.IDE0072.severity = none
 dotnet_diagnostic.IDE0079.severity = none
+dotnet_diagnostic.IDE0057.severity = suggestion

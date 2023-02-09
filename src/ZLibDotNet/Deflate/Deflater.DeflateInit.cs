@@ -11,16 +11,13 @@ internal static partial class Deflater
     private const int DefaultMemLevel = 8;
     private static readonly ObjectPool<DeflateState> s_objectPool = new();
 
-    internal static int DeflateInit(ZStream strm, int level) =>
-        DeflateInit(strm, level, Z_DEFLATED, MaxWindowBits, DefaultMemLevel, Z_DEFAULT_STRATEGY);
+    internal static int DeflateInit(ref ZStream strm, int level) =>
+        DeflateInit(ref strm, level, Z_DEFLATED, MaxWindowBits, DefaultMemLevel, Z_DEFAULT_STRATEGY);
 
-    internal static int DeflateInit(ZStream strm, int level, int method, int windowBits, int memLevel, int strategy)
+    internal static int DeflateInit(ref ZStream strm, int level, int method, int windowBits, int memLevel, int strategy)
     {
         const int MaxMemLevel = 9;
         const int MinMatch = 3;
-
-        if (strm == null)
-            return Z_STREAM_ERROR;
 
         strm.msg = null;
 
@@ -52,7 +49,6 @@ internal static partial class Deflater
         {
             s = s_objectPool.Get();
             strm.deflateState = s;
-            s.strm = strm;
             s.status = InitState; // to pass state test in DeflateReset()
 
             s.wrap = wrap;
@@ -83,7 +79,7 @@ internal static partial class Deflater
             if (s != default)
                 s.status = FinishState;
             strm.msg = s_z_errmsg[Z_NEED_DICT - Z_MEM_ERROR];
-            _ = DeflateEnd(strm);
+            _ = DeflateEnd(ref strm);
             return Z_MEM_ERROR;
         }
         catch (Exception)
@@ -109,6 +105,6 @@ internal static partial class Deflater
         s.strategy = strategy;
         s.method = (byte)method;
 
-        return DeflateReset(strm);
+        return DeflateReset(ref strm);
     }
 }

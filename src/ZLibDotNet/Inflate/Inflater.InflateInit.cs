@@ -9,11 +9,8 @@ internal static partial class Inflater
 {
     private static readonly ObjectPool<InflateState> s_objectPool = new();
 
-    internal static int InflateInit(ZStream strm, int windowBits)
+    internal static int InflateInit(ref ZStream strm, int windowBits)
     {
-        if (strm == null)
-            return Z_STREAM_ERROR;
-
         strm.msg = null;
         InflateState state;
         try
@@ -26,10 +23,9 @@ internal static partial class Inflater
         }
         Trace.Tracev("inflate: allocated\n");
         strm.inflateState = state;
-        state.strm = strm;
         state.mode = InflateMode.Head;
 
-        int ret = InflateReset(strm, windowBits);
+        int ret = InflateReset(ref strm, windowBits);
         if (ret != Z_OK)
         {
             s_objectPool.Return(state);

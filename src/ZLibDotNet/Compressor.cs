@@ -20,7 +20,7 @@ internal static class Compressor
         destLen = 0;
 
         ZStream stream = new() { _input = source, _output = dest };
-        int err = Deflater.DeflateInit(stream, level);
+        int err = Deflater.DeflateInit(ref stream, level);
         if (err != Z_OK)
             return err;
 
@@ -36,11 +36,11 @@ internal static class Compressor
                 stream.avail_in = (uint)(sourceLen > Max ? Max : sourceLen);
                 sourceLen -= (int)stream.avail_in;
             }
-            err = Deflater.Deflate(stream, sourceLen != 0 ? Z_NO_FLUSH : Z_FINISH);
+            err = Deflater.Deflate(ref stream, sourceLen != 0 ? Z_NO_FLUSH : Z_FINISH);
         } while (err == Z_OK);
 
         destLen = (int)stream.total_out;
-        _ = Deflater.DeflateEnd(stream);
+        _ = Deflater.DeflateEnd(ref stream);
 
         return err == Z_STREAM_END ? Z_OK : err;
     }
@@ -66,7 +66,7 @@ internal static class Compressor
             }
 
             ZStream stream = new() { _input = source, _output = dest };
-            int err = Inflater.InflateInit(stream, DefaultWindowBits);
+            int err = Inflater.InflateInit(ref stream, DefaultWindowBits);
             if (err != Z_OK)
                 return err;
 
@@ -82,7 +82,7 @@ internal static class Compressor
                     stream.avail_in = (uint)(len > Max ? Max : len);
                     len -= (int)stream.avail_in;
                 }
-                err = Inflater.Inflate(stream, Z_NO_FLUSH);
+                err = Inflater.Inflate(ref stream, Z_NO_FLUSH);
             } while (err == Z_OK);
 
             sourceLen -= len + (int)stream.avail_in;
@@ -91,7 +91,7 @@ internal static class Compressor
             else if (stream.total_out != 0 && err == Z_BUF_ERROR)
                 left = 1;
 
-            _ = Inflater.InflateEnd(stream);
+            _ = Inflater.InflateEnd(ref stream);
             return err == Z_STREAM_END ? Z_OK :
                    err == Z_NEED_DICT ? Z_DATA_ERROR :
                    err == Z_BUF_ERROR && left + stream.avail_out != 0 ? Z_DATA_ERROR :

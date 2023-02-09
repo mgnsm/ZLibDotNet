@@ -9,9 +9,9 @@ namespace ZLibDotNet.Deflate;
 
 internal static partial class Deflater
 {
-    internal static int DeflateSetDictionary(ZStream strm, byte[] dictionary, uint dictLength)
+    internal static int DeflateSetDictionary(ref ZStream strm, byte[] dictionary, uint dictLength)
     {
-        if (DeflateStateCheck(strm) || dictionary == null)
+        if (DeflateStateCheck(ref strm) || dictionary == null)
             return Z_STREAM_ERROR;
         DeflateState s = strm.deflateState;
 
@@ -41,7 +41,7 @@ internal static partial class Deflater
 
         // insert dictionary into window and hash
         uint avail = strm.avail_in;
-        byte[] input = strm._input;
+        ReadOnlySpan<byte> input = strm._input;
         uint next = strm.next_in;
         strm.avail_in = dictLength;
         strm._input = dictionary;
@@ -51,7 +51,7 @@ internal static partial class Deflater
         ref byte window = ref MemoryMarshal.GetReference(s.window.AsSpan());
         ref ushort prev = ref MemoryMarshal.GetReference(s.prev.AsSpan());
         ref ushort head = ref MemoryMarshal.GetReference(s.head.AsSpan());
-        FillWindow(s, ref window, ref prev, ref head);
+        FillWindow(ref strm, ref window, ref prev, ref head);
         while (s.lookahead >= MinMatch)
         {
             str = s.strstart;
@@ -66,7 +66,7 @@ internal static partial class Deflater
             } while (--n != 0);
             s.strstart = str;
             s.lookahead = MinMatch - 1;
-            FillWindow(s, ref window, ref prev, ref head);
+            FillWindow(ref strm, ref window, ref prev, ref head);
         }
         s.strstart += s.lookahead;
         s.block_start = (int)s.strstart;

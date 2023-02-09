@@ -8,9 +8,9 @@ namespace ZLibDotNet.Deflate;
 
 internal static partial class Deflater
 {
-    internal static int DeflateParams(ZStream strm, int level, int strategy)
+    internal static int DeflateParams(ref ZStream strm, int level, int strategy)
     {
-        if (DeflateStateCheck(strm))
+        if (DeflateStateCheck(ref strm))
             return Z_STREAM_ERROR;
         DeflateState s = strm.deflateState;
 
@@ -24,7 +24,7 @@ internal static partial class Deflater
             && s.last_flush != -2)
         {
             // Flush the last buffer:
-            int err = Deflate(strm, Z_BLOCK);
+            int err = Deflate(ref strm, Z_BLOCK);
             if (err == Z_STREAM_ERROR)
                 return err;
             if (strm.avail_in != 0 || s.strstart - s.block_start + s.lookahead != 0)

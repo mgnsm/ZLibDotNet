@@ -17,8 +17,8 @@ public interface IZLib
     /// <param name="strm">The stream to be initialized for compression.</param>
     /// <param name="level">The compression level. It must be <see cref="Z_DEFAULT_COMPRESSION" />, or between 0 and 9: 1 gives best speed, 9 gives best compression, 0 gives no compression at all (the input data is simply copied a block at a time). <see cref="Z_DEFAULT_COMPRESSION" /> requests a default compromise between speed and compression (equivalent to level 6).</param>
     /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, or <see cref="Z_STREAM_ERROR"/> if level is not a valid compression level.</returns>
-    /// <remarks>This method does not perform any compression. Actual compression will be done by <see cref="Deflate(ZStream, int)"/>.</remarks>
-    int DeflateInit(ZStream strm, int level);
+    /// <remarks>This method does not perform any compression. Actual compression will be done by <see cref="Deflate(ref ZStream, int)"/>.</remarks>
+    int DeflateInit(ref ZStream strm, int level);
 
     /// <summary>
     /// Initializes the internal stream state for compression.
@@ -26,12 +26,12 @@ public interface IZLib
     /// <param name="strm">The stream to be initialized for compression.</param>
     /// <param name="level">The compression level. It must be <see cref="Z_DEFAULT_COMPRESSION" />, or between 0 and 9: 1 gives best speed, 9 gives best compression, 0 gives no compression at all (the input data is simply copied a block at a time). <see cref="Z_DEFAULT_COMPRESSION" /> requests a default compromise between speed and compression (equivalent to level 6).</param>
     /// <param name="method">The compression method. It must be <see cref="Z_DEFLATED"/>.</param>
-    /// <param name="windowBits">The base two logarithm of the window size (the size of the history buffer). It should be in the range 8..15 or -8..-15 for raw deflate. Larger values of this parameter result in better compression at the expense of memory usage. The default value is 15 if the <see cref="DeflateInit(ZStream, int)"/> overload is used instead.</param>
+    /// <param name="windowBits">The base two logarithm of the window size (the size of the history buffer). It should be in the range 8..15 or -8..-15 for raw deflate. Larger values of this parameter result in better compression at the expense of memory usage. The default value is 15 if the <see cref="DeflateInit(ref ZStream, int)"/> overload is used instead.</param>
     /// <param name="memLevel">Specifies how much memory should be allocated for the internal compression state. <paramref name="memLevel"/>=1 uses minimum memory but is slow and reduces compression ratio; <paramref name="memLevel"/>=9 uses maximum memory for optimal speed. The default value is 8.</param>
     /// <param name="strategy">Used to tune the compression algorithm. Use the value <see cref="Z_DEFAULT_STRATEGY"/> for normal data, <see cref="Z_FILTERED"/> for data produced by a filter(or predictor), <see cref="Z_HUFFMAN_ONLY"/> to force Huffman encoding only (no string match), or <see cref="Z_RLE"/> to limit match distances to one (run-length encoding).</param>
     /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, or <see cref="Z_STREAM_ERROR"/> if any parameter is invalid (such as an invalid method).</returns>
-    /// <remarks>This method does not perform any compression. Actual compression will be done by <see cref="Deflate(ZStream, int)"/>.</remarks>
-    int DeflateInit(ZStream strm, int level, int method, int windowBits, int memLevel, int strategy);
+    /// <remarks>This method does not perform any compression. Actual compression will be done by <see cref="Deflate(ref ZStream, int)"/>.</remarks>
+    int DeflateInit(ref ZStream strm, int level, int method, int windowBits, int memLevel, int strategy);
 
     /// <summary>
     /// Compresses as much data as possible, and stops when the input buffer becomes empty or the output buffer becomes full. It may introduce some output latency(reading input without producing any output) except when forced to flush.
@@ -43,8 +43,8 @@ public interface IZLib
     /// </summary>
     /// <param name="strm">The stream to be compressed.</param>
     /// <param name="flush">The flush parameter. Should be set to <see cref="Z_NO_FLUSH" />, <see cref="Z_SYNC_FLUSH" />, <see cref="Z_PARTIAL_FLUSH" />, <see cref="Z_BLOCK" />, <see cref="Z_FULL_FLUSH" />, or <see cref="Z_FINISH" />.</param>
-    /// <returns><see cref="Z_OK"/> if some progress has been made (more input processed or more output produced), <see cref="Z_STREAM_END" /> if all input has been consumed and all output has been produced (only when <param ref="flush" /> is set to <see cref="Z_FINISH" />), <see cref="Z_STREAM_ERROR" /> if the stream state was inconsistent (for example if <see cref="ZStream.NextIn"/> or <see cref="ZStream.NextOut"/> of <paramref name="strm"/> was <see langword="null" /> or the state was inadvertently written over by the application), or <see cref="Z_BUF_ERROR" /> if no progress is possible (for example <see cref="ZStream.AvailableIn"/> or <see cref="ZStream.AvailableOut"/> of <paramref name="strm"/> was zero).</returns>
-    int Deflate(ZStream strm, int flush);
+    /// <returns><see cref="Z_OK"/> if some progress has been made (more input processed or more output produced), <see cref="Z_STREAM_END" /> if all input has been consumed and all output has been produced (only when <param ref="flush" /> is set to <see cref="Z_FINISH" />), <see cref="Z_STREAM_ERROR" /> if the stream state was inconsistent (for example if <see cref="ZStream.Input"/> or <see cref="ZStream.Output"/> of <paramref name="strm"/> was not set or the state was inadvertently written over by the application), or <see cref="Z_BUF_ERROR" /> if no progress is possible (for example <see cref="ZStream.AvailableIn"/> or <see cref="ZStream.AvailableOut"/> of <paramref name="strm"/> was zero).</returns>
+    int Deflate(ref ZStream strm, int flush);
 
     /// <summary>
     /// Resets the state of a stream. Any dynamically allocated resources for the stream are freed.
@@ -52,24 +52,24 @@ public interface IZLib
     /// <param name="strm">The stream to be reset.</param>
     /// <returns><see cref="Z_OK"/> if success, <see cref="Z_STREAM_ERROR"/> if the stream state was inconsistent, or <see cref="Z_DATA_ERROR"/> if some input or output was discarded.</returns>
     /// <remarks>This method discards any unprocessed input and does not flush any pending output.</remarks>
-    int DeflateEnd(ZStream strm);
+    int DeflateEnd(ref ZStream strm);
 
     /// <summary>
     /// Initializes the internal stream state for decompression.
     /// </summary>
     /// <param name="strm">The stream to be initialized for decompression.</param>
-    /// <returns><see cref="Z_OK"/> on success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, or <see cref="Z_STREAM_ERROR"/> if <paramref name="strm"/> is <see langword="null"/>.</returns>
-    /// <remarks>This method does not perform any decompression. Actual decompression will be done by <see cref="Inflate(ZStream, int)"/>.</remarks>
-    int InflateInit(ZStream strm);
+    /// <returns><see cref="Z_OK"/> on success or <see cref="Z_MEM_ERROR"/> if there was not enough memory.</returns>
+    /// <remarks>This method does not perform any decompression. Actual decompression will be done by <see cref="Inflate(ref ZStream, int)"/>.</remarks>
+    int InflateInit(ref ZStream strm);
 
     /// <summary>
     /// Initializes the internal stream state for decompression.
     /// </summary>
     /// <param name="strm">The stream to be initialized for decompression.</param>
-    /// <param name="windowBits">The base two logarithm of the window size (the size of the history buffer). It should be in the range 8..15 or -8..-15 for raw deflate. Larger values of this parameter result in better compression at the expense of memory usage. The default value is 15 if the <see cref="InflateInit(ZStream)"/> overload is used instead.</param>
-    /// <returns><see cref="Z_OK"/> on success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, or <see cref="Z_STREAM_ERROR"/> if the parameters are invalid, such as <paramref name="strm"/> being <see langword="null"/>.</returns>
-    /// <remarks>This method does not perform any decompression apart from possibly reading the zlib header if present: actual decompression will be done by <see cref="Inflate(ZStream, int)"/>.</remarks>
-    int InflateInit(ZStream strm, int windowBits);
+    /// <param name="windowBits">The base two logarithm of the window size (the size of the history buffer). It should be in the range 8..15 or -8..-15 for raw deflate. Larger values of this parameter result in better compression at the expense of memory usage. The default value is 15 if the <see cref="InflateInit(ref ZStream)"/> overload is used instead.</param>
+    /// <returns><see cref="Z_OK"/> on success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, or <see cref="Z_STREAM_ERROR"/> if the parameters are invalid.</returns>
+    /// <remarks>This method does not perform any decompression apart from possibly reading the zlib header if present: actual decompression will be done by <see cref="Inflate(ref ZStream, int)"/>.</remarks>
+    int InflateInit(ref ZStream strm, int windowBits);
 
     /// <summary>
     /// Decompresses as much data as possible, and stops when the input buffer becomes empty or the output buffer becomes full. It may introduce some output latency (reading input without producing any output) except when forced to flush.
@@ -83,8 +83,8 @@ public interface IZLib
     /// </summary>
     /// <param name="strm">The stream to be decompressed.</param>
     /// <param name="flush">The flush parameter. Should be set to <see cref="Z_NO_FLUSH" />, <see cref="Z_SYNC_FLUSH" />, <see cref="Z_FINISH" />, <see cref="Z_BLOCK" />, or <see cref="Z_TREES" />.</param>
-    /// <returns><see cref="Z_OK"/> if some progress has been made (more input processed or more output produced), <see cref="Z_STREAM_END" /> if the end of the compressed data has been reached and all uncompressed output has been produced, <see cref="Z_NEED_DICT" /> if a preset dictionary is needed at this point, <see cref="Z_DATA_ERROR" /> if the input data was corrupted (input stream not conforming to the zlib format or incorrect check value, in which case the <see cref="ZStream.Message"/> property of the <paramref name="strm"/> returns a <see cref="string" /> with a more specific error), <see cref="Z_STREAM_ERROR" /> if the stream structure was inconsistent (for example if <see cref="ZStream.NextIn"/> or <see cref="ZStream.NextOut"/>of <paramref name="strm"/> was <see langword="null" />, or the state was inadvertently written over by the application), <see cref="Z_MEM_ERROR" /> if there was not enough memory, <see cref="Z_BUF_ERROR" /> if no progress was possible or if there was not enough room in the output buffer when <see cref="Z_FINISH" /> is used.</returns>
-    int Inflate(ZStream strm, int flush);
+    /// <returns><see cref="Z_OK"/> if some progress has been made (more input processed or more output produced), <see cref="Z_STREAM_END" /> if the end of the compressed data has been reached and all uncompressed output has been produced, <see cref="Z_NEED_DICT" /> if a preset dictionary is needed at this point, <see cref="Z_DATA_ERROR" /> if the input data was corrupted (input stream not conforming to the zlib format or incorrect check value, in which case the <see cref="ZStream.Message"/> property of the <paramref name="strm"/> returns a <see cref="string" /> with a more specific error), <see cref="Z_STREAM_ERROR" /> if the stream structure was inconsistent (for example if <see cref="ZStream.Input"/> or <see cref="ZStream.Output"/> of <paramref name="strm"/> was not set, or the state was inadvertently written over by the application), <see cref="Z_MEM_ERROR" /> if there was not enough memory, <see cref="Z_BUF_ERROR" /> if no progress was possible or if there was not enough room in the output buffer when <see cref="Z_FINISH" /> is used.</returns>
+    int Inflate(ref ZStream strm, int flush);
 
     /// <summary>
     /// Discards any unprocessed input and resets the state of a stream.
@@ -92,16 +92,16 @@ public interface IZLib
     /// <param name="strm">The stream to be reset.</param>
     /// <returns><see cref="Z_OK"/> on success, or <see cref="Z_STREAM_ERROR"/> if the stream state was inconsistent.</returns>
     /// <remarks>This method does not flush any pending output.</remarks>
-    int InflateEnd(ZStream strm);
+    int InflateEnd(ref ZStream strm);
 
     /// <summary>
     /// Initializes the compression dictionary from the given byte array without producing any compressed output.
     /// </summary>
     /// <param name="strm">An initialized compression stream.</param>
     /// <param name="dictionary">The compression dictionary.</param>
-    /// <returns><see cref="Z_OK"/> if success, or <see cref="Z_STREAM_ERROR"/> if a parameter is invalid (e.g. <paramref name="dictionary"/> being <see langword="null"/>) or the stream state is inconsistent (for example if <see cref="Deflate(ZStream, int)"/> has already been called for this stream or if not at a block boundary for raw deflate).</returns>
+    /// <returns><see cref="Z_OK"/> if success, or <see cref="Z_STREAM_ERROR"/> if a parameter is invalid (e.g. <paramref name="dictionary"/> being <see langword="null"/>) or the stream state is inconsistent (for example if <see cref="Deflate(ref ZStream, int)"/> has already been called for this stream or if not at a block boundary for raw deflate).</returns>
     /// <remarks>Upon return of this method, the <see cref="ZStream.Adler"/> property of the <paramref name="strm"/> is set to the Adler-32 value of the dictionary; the decompressor may later use this value to determine which dictionary has been used by the compressor.</remarks>
-    int DeflateSetDictionary(ZStream strm, byte[] dictionary);
+    int DeflateSetDictionary(ref ZStream strm, byte[] dictionary);
 
     /// <summary>
     /// Initializes the compression dictionary from the given byte array without producing any compressed output.
@@ -109,9 +109,9 @@ public interface IZLib
     /// <param name="strm">An initialized compression stream.</param>
     /// <param name="dictionary">The compression dictionary.</param>
     /// <param name="dictLength">The number of bytes available in the compression dictionary <paramref name="dictionary"/>.</param>
-    /// <returns><see cref="Z_OK"/> if success, or <see cref="Z_STREAM_ERROR"/> if a parameter is invalid (e.g. <paramref name="dictionary"/> being <see langword="null"/>) or the stream state is inconsistent (for example if <see cref="Deflate(ZStream, int)"/> has already been called for this stream or if not at a block boundary for raw deflate).</returns>
+    /// <returns><see cref="Z_OK"/> if success, or <see cref="Z_STREAM_ERROR"/> if a parameter is invalid (e.g. <paramref name="dictionary"/> being <see langword="null"/>) or the stream state is inconsistent (for example if <see cref="Deflate(ref ZStream, int)"/> has already been called for this stream or if not at a block boundary for raw deflate).</returns>
     /// <remarks>Upon return of this method, the <see cref="ZStream.Adler"/> property of the <paramref name="strm"/> is set to the Adler-32 value of the dictionary; the decompressor may later use this value to determine which dictionary has been used by the compressor.</remarks>
-    int DeflateSetDictionary(ZStream strm, byte[] dictionary, int dictLength);
+    int DeflateSetDictionary(ref ZStream strm, byte[] dictionary, int dictLength);
 
     /// <summary>
     /// Dynamically updates the compression level and compression strategy of a stream.
@@ -120,28 +120,28 @@ public interface IZLib
     /// <param name="level">The compression level. It must be <see cref="Z_DEFAULT_COMPRESSION" />, or between 0 and 9: 1 gives best speed, 9 gives best compression, 0 gives no compression at all (the input data is simply copied a block at a time). <see cref="Z_DEFAULT_COMPRESSION" /> requests a default compromise between speed and compression (equivalent to level 6).</param>
     /// <param name="strategy">The strategy. Used to tune the compression algorithm. Use the value <see cref="Z_DEFAULT_STRATEGY" /> for normal data, <see cref="Z_FILTERED" /> for data produced by a filter (or predictor), <see cref="Z_HUFFMAN_ONLY" /> to force Huffman encoding only (no string match), or <see cref="Z_RLE" /> to limit match distances to one (run-length encoding).</param>
     /// <returns><see cref="Z_OK"/> on success, <see cref="Z_STREAM_ERROR"/> if the source stream state was inconsistent or if a parameter was invalid, or <see cref="Z_BUF_ERROR"/> if there was not enough output space to complete the compression of the available input data before a change in the strategy or approach.</returns>
-    int DeflateParams(ZStream strm, int level, int strategy);
+    int DeflateParams(ref ZStream strm, int level, int strategy);
 
     /// <summary>
     /// Initializes the decompression dictionary from the given uncompressed byte sequence.
-    /// <para>This method must be called immediately after a call of <see cref="Inflate(ZStream, int)"/>, if that call returned <see cref="Z_NEED_DICT"/>. The dictionary chosen by the compressor can be determined from the Adler-32 value returned by that call of <see cref="Inflate(ZStream, int)"/>. The compressor and decompressor must use exactly the same dictionary (see <see cref="DeflateSetDictionary(ZStream, byte[])"/>).  For raw inflate, this function can be called at any time to set the dictionary. If the provided dictionary is smaller than the window and there is already data in the window, then the provided dictionary will amend what's there. The application must insure that the dictionary that was used for compression is provided.</para>
+    /// <para>This method must be called immediately after a call of <see cref="Inflate(ref ZStream, int)"/>, if that call returned <see cref="Z_NEED_DICT"/>. The dictionary chosen by the compressor can be determined from the Adler-32 value returned by that call of <see cref="Inflate(ref ZStream, int)"/>. The compressor and decompressor must use exactly the same dictionary (see <see cref="DeflateSetDictionary(ref ZStream, byte[])"/>).  For raw inflate, this function can be called at any time to set the dictionary. If the provided dictionary is smaller than the window and there is already data in the window, then the provided dictionary will amend what's there. The application must insure that the dictionary that was used for compression is provided.</para>
     /// </summary>
     /// <param name="strm">An initialized decompression stream.</param>
     /// <param name="dictionary">The decompression dictionary.</param>
     /// <returns><see cref="Z_OK"/> if success, <see cref="Z_STREAM_ERROR"/> if a parameter is invalid (e.g. <paramref name="dictionary"/> being <see langword="null"/>) or the stream state is inconsistent, <see cref="Z_DATA_ERROR"/> if the given dictionary doesn't match the expected one (incorrect Adler-32 value).</returns>
-    /// <remarks>This method does not perform any decompression: this will be done by subsequent calls of <see cref="Inflate(ZStream, int)"/>.</remarks>
-    int InflateSetDictionary(ZStream strm, byte[] dictionary);
+    /// <remarks>This method does not perform any decompression: this will be done by subsequent calls of <see cref="Inflate(ref ZStream, int)"/>.</remarks>
+    int InflateSetDictionary(ref ZStream strm, byte[] dictionary);
 
     /// <summary>
     /// Initializes the decompression dictionary from the given uncompressed byte sequence.
-    /// <para>This method must be called immediately after a call of <see cref="Inflate(ZStream, int)"/>, if that call returned <see cref="Z_NEED_DICT"/>. The dictionary chosen by the compressor can be determined from the Adler-32 value returned by that call of <see cref="Inflate(ZStream, int)"/>. The compressor and decompressor must use exactly the same dictionary (see <see cref="DeflateSetDictionary(ZStream, byte[])"/>).  For raw inflate, this function can be called at any time to set the dictionary. If the provided dictionary is smaller than the window and there is already data in the window, then the provided dictionary will amend what's there. The application must insure that the dictionary that was used for compression is provided.</para>
+    /// <para>This method must be called immediately after a call of <see cref="Inflate(ref ZStream, int)"/>, if that call returned <see cref="Z_NEED_DICT"/>. The dictionary chosen by the compressor can be determined from the Adler-32 value returned by that call of <see cref="Inflate(ref ZStream, int)"/>. The compressor and decompressor must use exactly the same dictionary (see <see cref="DeflateSetDictionary(ref ZStream, byte[])"/>).  For raw inflate, this function can be called at any time to set the dictionary. If the provided dictionary is smaller than the window and there is already data in the window, then the provided dictionary will amend what's there. The application must insure that the dictionary that was used for compression is provided.</para>
     /// </summary>
     /// <param name="strm">An initialized decompression stream.</param>
     /// <param name="dictionary">The decompression dictionary.</param>
     /// <param name="dictLength">The number of bytes available in the decompression dictionary <paramref name="dictionary"/>.</param>
     /// <returns><see cref="Z_OK"/> if success, <see cref="Z_STREAM_ERROR"/> if a parameter is invalid (e.g. <paramref name="dictionary"/> being <see langword="null"/>) or the stream state is inconsistent, <see cref="Z_DATA_ERROR"/> if the given dictionary doesn't match the expected one (incorrect Adler-32 value).</returns>
-    /// <remarks>This method does not perform any decompression: this will be done by subsequent calls of <see cref="Inflate(ZStream, int)"/>.</remarks>
-    public int InflateSetDictionary(ZStream strm, byte[] dictionary, int dictLength);
+    /// <remarks>This method does not perform any decompression: this will be done by subsequent calls of <see cref="Inflate(ref ZStream, int)"/>.</remarks>
+    public int InflateSetDictionary(ref ZStream strm, byte[] dictionary, int dictLength);
 
     /// <summary>
     /// Skips invalid compressed data until a possible full flush point can be found, or until all available input is skipped. No output is provided.
@@ -149,40 +149,40 @@ public interface IZLib
     /// </summary>
     /// <param name="strm">The compressed data stream.</param>
     /// <returns><see cref="Z_OK"/> if a possible full flush point has been found, <see cref="Z_BUF_ERROR"/> if no more input was provided, <see cref="Z_DATA_ERROR"/> if no flush point has been found, or <see cref="Z_STREAM_ERROR"/> if the stream structure was inconsistent.</returns>
-    int InflateSync(ZStream strm);
+    int InflateSync(ref ZStream strm);
 
     /// <summary>
     /// Sets the destination stream as a complete copy of the source stream.
     /// </summary>
     /// <param name="source">The source stream.</param>
     /// <param name="dest">The destination stream.</param>
-    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_STREAM_ERROR"/> if the source stream state was inconsistent.  <see cref="ZStream.Message"/> is left unchanged in both <paramref name="source"/> and <paramref name="dest"/>.</returns>
-    int InflateCopy(ZStream source, ZStream dest);
+    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_STREAM_ERROR"/> if the <paramref name="source"/> stream state was inconsistent. <see cref="ZStream.Message"/> is left unchanged in both <paramref name="source"/> and <paramref name="dest"/>.</returns>
+    int InflateCopy(ref ZStream source, ref ZStream dest);
 
     /// <summary>
-    /// Equivalent to <see cref="InflateEnd(ZStream)"/> followed by <see cref="InflateInit(ZStream)"/>, but does not reallocate the internal decompression state. The stream will keep attributes that may have been set by <see cref="InflateInit(ZStream, int)"/>.
+    /// Equivalent to <see cref="InflateEnd(ref ZStream)"/> followed by <see cref="InflateInit(ref ZStream)"/>, but does not reallocate the internal decompression state. The stream will keep attributes that may have been set by <see cref="InflateInit(ref ZStream, int)"/>.
     /// </summary>
     /// <param name="strm">A decompression stream to be reset.</param>
-    /// <returns><see cref="Z_OK"/> if success, or <see cref="Z_STREAM_ERROR"/> if the source stream state was inconsistent (such as <paramref name="strm"/> being <see langword="null"/>).</returns>
-    int InflateReset(ZStream strm);
+    /// <returns><see cref="Z_OK"/> if success, or <see cref="Z_STREAM_ERROR"/> if the source stream state was inconsistent.</returns>
+    int InflateReset(ref ZStream strm);
 
     /// <summary>
-    /// This method is the same as <see cref="InflateReset(ZStream)"/>, but it also permits changing the wrap and window size requests.
+    /// This method is the same as <see cref="InflateReset(ref ZStream)"/>, but it also permits changing the wrap and window size requests.
     /// </summary>
     /// <param name="strm">A decompression stream to be reset.</param>
     /// <param name="windowBits">The base two logarithm of the window size (the size of the history buffer). It should be in the range 8..15 or -8..-15 for raw deflate.</param>
-    /// <returns><see cref="Z_OK"/> if success, or <see cref="Z_STREAM_ERROR"/> if the source stream state was inconsistent (such as <paramref name="strm"/> being <see langword="null"/>), or if the <paramref name="windowBits"/> parameter is invalid.</returns>
-    int InflateReset(ZStream strm, int windowBits);
+    /// <returns><see cref="Z_OK"/> if success, or <see cref="Z_STREAM_ERROR"/> if the source stream state was inconsistent, or if the <paramref name="windowBits"/> parameter is invalid.</returns>
+    int InflateReset(ref ZStream strm, int windowBits);
 
     /// <summary>
     /// Inserts bits in the inflate input stream. The intent is that this method is used to start inflating at a bit position in the middle of a byte.
     /// </summary>
     /// <param name="strm">An initialized decompression stream.</param>
-    /// <param name="bits">The provided bits to be used before any bytes are used from the byte at index <see cref="ZStream.NextIn"/> of the <see cref="ZStream.Input"/> of <paramref name="strm"/>. Must be less than or equal to 16. If <paramref name="bits"/> is negative, then the input stream bit buffer is emptied. Then this method can be called again to put bits in the buffer. This is used  to clear out bits leftover after feeding inflate a block description prior  to feeding inflate codes.</param>
+    /// <param name="bits">The provided bits to be used before any bytes are used from <see cref="ZStream.Input"/> of <paramref name="strm"/>. Must be less than or equal to 16. If <paramref name="bits"/> is negative, then the input stream bit buffer is emptied. Then this method can be called again to put bits in the buffer. This is used  to clear out bits leftover after feeding inflate a block description prior to feeding inflate codes.</param>
     /// <param name="value">A value whose <paramref name="bits"/> least significant bits will be inserted in the input.</param>
     /// <returns><see cref="Z_OK"/> if success, or <see cref="Z_STREAM_ERROR"/> if the source stream state was inconsistent.</returns>
-    /// <remarks>This mehtod should only be used with raw inflate, and should be used before the first <see cref="Inflate(ZStream, int)"/> call after <see cref="InflateInit(ZStream, int)"/> or <see cref="InflateReset(ZStream)"/>().</remarks>
-    int InflatePrime(ZStream strm, int bits, int value);
+    /// <remarks>This mehtod should only be used with raw inflate, and should be used before the first <see cref="Inflate(ref ZStream, int)"/> call after <see cref="InflateInit(ref ZStream, int)"/> or <see cref="InflateReset(ref ZStream)"/>().</remarks>
+    int InflatePrime(ref ZStream strm, int bits, int value);
 
     /// <summary>
     /// Compresses the source buffer into the destination buffer.

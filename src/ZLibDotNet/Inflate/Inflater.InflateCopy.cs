@@ -9,10 +9,10 @@ namespace ZLibDotNet.Inflate;
 
 internal static partial class Inflater
 {
-    internal static int InflateCopy(ZStream dest, ZStream source)
+    internal static int InflateCopy(ref ZStream dest, ref ZStream source)
     {
         // check input
-        if (InflateStateCheck(source) || dest == null)
+        if (InflateStateCheck(ref source))
             return Z_STREAM_ERROR;
         InflateState state = source.inflateState;
 
@@ -57,7 +57,6 @@ internal static partial class Inflater
         dest.next_in = source.next_in;
         dest.next_out = source.next_out;
 
-        copy.strm = dest;
         copy.mode = state.mode;
         copy.last = state.last;
         copy.wrap = state.wrap;
