@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2022 Magnus Montin
+﻿// Copyright (C) 2022-2023 Magnus Montin
 
 using System;
 using ZLibDotNet.Deflate;

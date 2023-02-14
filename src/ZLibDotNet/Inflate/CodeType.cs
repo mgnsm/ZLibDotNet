@@ -1,5 +1,5 @@
 ﻿// Original code Copyright (C) 1995-2005, 2010 Mark Adler
-// Managed C#/.NET code Copyright (C) 2022 Magnus Montin
+// Managed C#/.NET code Copyright (C) 2022-2023 Magnus Montin
 
 namespace ZLibDotNet.Inflate;
 

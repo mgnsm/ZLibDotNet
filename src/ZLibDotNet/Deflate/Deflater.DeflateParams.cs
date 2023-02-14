@@ -1,5 +1,5 @@
 ﻿// Original code and comments Copyright (C) 1995-2022 Jean-loup Gailly and Mark Adler
-// Managed C#/.NET code Copyright (C) 2022 Magnus Montin
+// Managed C#/.NET code Copyright (C) 2022-2023 Magnus Montin
 
 using System;
 using System.Runtime.InteropServices;
