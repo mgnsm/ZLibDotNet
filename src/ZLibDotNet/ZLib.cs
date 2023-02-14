@@ -135,8 +135,17 @@ public partial class ZLib : IZLib
         if (dictionary == null || dictLength < 0 || dictLength > dictionary.Length)
             return Z_STREAM_ERROR;
 
-        return Deflater.DeflateSetDictionary(ref strm, dictionary, (uint)dictLength);
+        return Deflater.DeflateSetDictionary(ref strm, dictionary.AsSpan(0, dictLength));
     }
+
+    /// <summary>
+    /// Initializes the compression dictionary from the given byte array without producing any compressed output.
+    /// </summary>
+    /// <param name="strm">An initialized compression stream.</param>
+    /// <param name="dictionary">The compression dictionary.</param>
+    /// <returns><see cref="Z_OK"/> if success, or <see cref="Z_STREAM_ERROR"/> if the stream state is inconsistent (for example if <see cref="Deflate(ref ZStream, int)"/> has already been called for this stream or if not at a block boundary for raw deflate).</returns>
+    public int DeflateSetDictionary(ref ZStream strm, ReadOnlySpan<byte> dictionary) =>
+        Deflater.DeflateSetDictionary(ref strm, dictionary);
 
     /// <summary>
     /// Initializes the decompression dictionary from the given uncompressed byte sequence.
@@ -150,7 +159,7 @@ public partial class ZLib : IZLib
 
     /// <summary>
     /// Initializes the decompression dictionary from the given uncompressed byte sequence.
-    /// <para>This method must be called immediately after a call of <see cref="Inflate(ref ZStream, int)"/>, if that call returned <see cref="Z_NEED_DICT"/>. The dictionary chosen by the compressor can be determined from the Adler-32 value returned by that call of <see cref="Inflate(ref ZStream, int)"/>. The compressor and decompressor must use exactly the same dictionary (see <see cref="DeflateSetDictionary(ref ZStream, byte[])"/>).  For raw inflate, this function can be called at any time to set the dictionary. If the provided dictionary is smaller than the window and there is already data in the window, then the provided dictionary will amend what's there. The application must insure that the dictionary that was used for compression is provided.</para>
+    /// <para>This method must be called immediately after a call of <see cref="Inflate(ref ZStream, int)"/>, if that call returned <see cref="Z_NEED_DICT"/>. The dictionary chosen by the compressor can be determined from the Adler-32 value returned by that call of <see cref="Inflate(ref ZStream, int)"/>. The compressor and decompressor must use exactly the same dictionary (see <see cref="DeflateSetDictionary(ref ZStream, byte[], int)"/>). For raw inflate, this function can be called at any time to set the dictionary. If the provided dictionary is smaller than the window and there is already data in the window, then the provided dictionary will amend what's there. The application must insure that the dictionary that was used for compression is provided.</para>
     /// </summary>
     /// <param name="strm">An initialized decompression stream.</param>
     /// <param name="dictionary">The decompression dictionary.</param>
@@ -162,9 +171,19 @@ public partial class ZLib : IZLib
         if (dictionary == null || dictLength < 0 || dictLength > dictionary.Length)
             return Z_STREAM_ERROR;
 
-        ref byte dict = ref MemoryMarshal.GetReference(dictionary.AsSpan());
-        return Inflater.InflateSetDictionary(ref strm, ref dict, (uint)dictLength);
+        return InflateSetDictionary(ref strm, dictionary.AsSpan(0, dictLength));
     }
+
+    /// <summary>
+    /// Initializes the decompression dictionary from the given uncompressed byte sequence.
+    /// <para>This method must be called immediately after a call of <see cref="Inflate(ref ZStream, int)"/>, if that call returned <see cref="Z_NEED_DICT"/>. The dictionary chosen by the compressor can be determined from the Adler-32 value returned by that call of <see cref="Inflate(ref ZStream, int)"/>. The compressor and decompressor must use exactly the same dictionary (see <see cref="DeflateSetDictionary(ref ZStream, ReadOnlySpan{byte})"/>). For raw inflate, this function can be called at any time to set the dictionary. If the provided dictionary is smaller than the window and there is already data in the window, then the provided dictionary will amend what's there. The application must insure that the dictionary that was used for compression is provided.</para>
+    /// </summary>
+    /// <param name="strm">An initialized decompression stream.</param>
+    /// <param name="dictionary">The decompression dictionary.</param>
+    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_STREAM_ERROR"/> if a parameter is invalid (e.g. the stream state is inconsistent), <see cref="Z_DATA_ERROR"/> if the given dictionary doesn't match the expected one (incorrect Adler-32 value).</returns>
+    /// <remarks>This method does not perform any decompression: this will be done by subsequent calls of <see cref="Inflate(ref ZStream, int)"/>.</remarks>
+    public int InflateSetDictionary(ref ZStream strm, ReadOnlySpan<byte> dictionary) =>
+        Inflater.InflateSetDictionary(ref strm, ref MemoryMarshal.GetReference(dictionary), (uint)dictionary.Length);
 
     /// <summary>
     /// Skips invalid compressed data until a possible full flush point can be found, or until all available input is skipped. No output is provided.
@@ -234,9 +253,39 @@ public partial class ZLib : IZLib
     /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer, or Z_STREAM_ERROR if any of the level parameters are invalid.</returns>
     public int Compress(byte[] dest, out int destLen, byte[] source, int sourceLen, int level)
     {
-        int bytesCompressed = dest?.Length ?? 0;
-        int ret = Compressor.Compress(dest, ref bytesCompressed, source, sourceLen, level);
-        destLen = bytesCompressed;
+        if (source == null || dest == null || sourceLen < 0 || sourceLen > source.Length)
+        {
+            destLen = default;
+            return Z_STREAM_ERROR;
+        }
+
+        return Compress(dest, out destLen, source.AsSpan(0, sourceLen), level);
+    }
+
+    /// <summary>
+    /// Compresses the source buffer into the destination buffer.
+    /// </summary>
+    /// <param name="dest">The destination buffer.</param>
+    /// <param name="destLen">The actual size of the compressed buffer upon exit.</param>
+    /// <param name="source">The source buffer.</param>
+    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer, or Z_STREAM_ERROR if any of the level parameters are invalid.</returns>
+    /// <remarks><see cref="Compress(Span{byte}, out int, ReadOnlySpan{byte})"/> is equivalent to <see cref="Compress(Span{byte}, out int, ReadOnlySpan{byte}, int)"/> with a level parameter of <see cref="Z_DEFAULT_COMPRESSION"/>.</remarks>
+    public int Compress(Span<byte> dest, out int destLen, ReadOnlySpan<byte> source) =>
+        Compress(dest, out destLen, source, Z_DEFAULT_COMPRESSION);
+
+    /// <summary>
+    /// Compresses the source buffer into the destination buffer.
+    /// </summary>
+    /// <param name="dest">The destination buffer.</param>
+    /// <param name="destLen">The actual size of the compressed buffer upon exit.</param>
+    /// <param name="source">The source buffer.</param>
+    /// <param name="level">The compression level.</param>
+    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer, or Z_STREAM_ERROR if any of the level parameters are invalid.</returns>
+    public int Compress(Span<byte> dest, out int destLen, ReadOnlySpan<byte> source, int level)
+    {
+        uint bytesCompressed = (uint)dest.Length;
+        int ret = Compressor.Compress(dest, ref bytesCompressed, source, (uint)source.Length, level);
+        destLen = (int)bytesCompressed;
         return ret;
     }
 
@@ -259,16 +308,13 @@ public partial class ZLib : IZLib
     /// <remarks>In the case where there is not enough room, the method will fill the destination buffer with the uncompressed data up to that point.</remarks>
     public int Uncompress(byte[] dest, out int destLen, byte[] source, int sourceLen)
     {
-        int bytesUncompressed = dest?.Length ?? 0;
-        if (sourceLen < 0 || sourceLen > bytesUncompressed)
+        if (dest == null || source == null || sourceLen < 0 || sourceLen > source.Length)
         {
             destLen = default;
             return Z_STREAM_ERROR;
         }
 
-        int ret = Compressor.Uncompress(dest, ref bytesUncompressed, source, ref sourceLen);
-        destLen = bytesUncompressed;
-        return ret;
+        return Uncompress(dest, out destLen, source.AsSpan(0, sourceLen));
     }
 
     /// <summary>
@@ -282,13 +328,63 @@ public partial class ZLib : IZLib
     /// <remarks>In the case where there is not enough room, the method will fill the destination buffer with the uncompressed data up to that point.</remarks>
     public int Uncompress(byte[] dest, out int destLen, byte[] source, out int sourceLen)
     {
-        int bytesUncompressed = dest?.Length ?? 0;
-        int bytesConsumed = source?.Length ?? 0;
+        if (dest == null || source == null)
+        {
+            destLen = default;
+            sourceLen = default;
+            return Z_STREAM_ERROR;
+        }
+
+        return Uncompress(dest.AsSpan(), out destLen, source, out sourceLen);
+    }
+
+    /// <summary>
+    /// Decompresses the source buffer into the destination buffer.
+    /// </summary>
+    /// <param name="dest">The destination buffer.</param>
+    /// <param name="destLen">The actual size of the uncompressed data upon exit.</param>
+    /// <param name="source">The source buffer.</param>
+    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer, or <see cref="Z_DATA_ERROR"/> if the input data was corrupted or incomplete.</returns>
+    /// <remarks>In the case where there is not enough room, the method will fill the destination buffer with the uncompressed data up to that point.</remarks>
+    public int Uncompress(Span<byte> dest, out int destLen, ReadOnlySpan<byte> source) => Uncompress(dest, out destLen, source, out _);
+
+    /// <summary>
+    /// Decompresses the source buffer into the destination buffer.
+    /// </summary>
+    /// <param name="dest">The destination buffer.</param>
+    /// <param name="destLen">The actual size of the uncompressed data upon exit.</param>
+    /// <param name="source">The source buffer.</param>
+    /// <param name="sourceLen">The number of source bytes consumed upon exit.</param>
+    /// <returns><see cref="Z_OK"/> if success, <see cref="Z_MEM_ERROR"/> if there was not enough memory, <see cref="Z_BUF_ERROR"/> if there was not enough room in the output buffer, or <see cref="Z_DATA_ERROR"/> if the input data was corrupted or incomplete.</returns>
+    /// <remarks>In the case where there is not enough room, the method will fill the destination buffer with the uncompressed data up to that point.</remarks>
+    public int Uncompress(Span<byte> dest, out int destLen, ReadOnlySpan<byte> source, out int sourceLen)
+    {
+        uint bytesUncompressed = (uint)dest.Length;
+        uint bytesConsumed = (uint)source.Length;
         int ret = Compressor.Uncompress(dest, ref bytesUncompressed, source, ref bytesConsumed);
-        destLen = bytesUncompressed;
-        sourceLen = bytesConsumed;
+        destLen = (int)bytesUncompressed;
+        sourceLen = (int)bytesConsumed;
         return ret;
     }
+
+    /// <summary>
+    /// Updates a running Adler-32 checksum and returns the updated checksum.
+    /// </summary>
+    /// <param name="adler">The checksum to be updated.</param>
+    /// <param name="buf">The bytes of data to be added to the checksum.</param>
+    /// <param name="len">The actual size of <paramref name="buf"/>.</param>
+    /// <returns>An Adler-32 checksum.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="len"/> is a negative value.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="len"/> is greater than the length of <paramref name="buf"/>.</exception>
+    public uint Adler32(uint adler, byte[] buf, int len)
+    {
+        if (len < 0 || len > (buf?.Length ?? 0))
+            throw new ArgumentOutOfRangeException(nameof(len),
+                $"Value was out of range. Must be non-negative and less than or equal to the size of {nameof(buf)}.");
+
+        return Adler32(adler, buf.AsSpan(len));
+    }
+
     /// <summary>
     /// Updates a running Adler-32 checksum and returns the updated checksum.
     /// </summary>

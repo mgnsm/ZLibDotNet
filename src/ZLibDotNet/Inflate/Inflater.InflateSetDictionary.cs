@@ -9,7 +9,7 @@ internal static partial class Inflater
 {
     internal static int InflateSetDictionary(ref ZStream strm, ref byte dictionary, uint dictLength)
     {
-        if (InflateStateCheck(ref strm) || netUnsafe.IsNullRef(ref dictionary))
+        if (InflateStateCheck(ref strm))
             return Z_STREAM_ERROR;
 
         InflateState state = strm.inflateState;

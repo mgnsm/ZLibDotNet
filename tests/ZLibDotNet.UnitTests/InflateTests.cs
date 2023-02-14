@@ -231,6 +231,7 @@ public class InflateTests
         Assert.IsTrue(Enumerable.SequenceEqual(uncompr.TakeWhile(b => b != 0), s_hello), "bad inflate with dict");
 
         Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateSetDictionary(ref zStream, default));
+        Assert.AreEqual(Z_STREAM_ERROR, zlib.InflateSetDictionary(ref zStream, ReadOnlySpan<byte>.Empty));
     }
 
     [TestMethod]

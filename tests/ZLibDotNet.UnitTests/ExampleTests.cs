@@ -1,4 +1,4 @@
-﻿using System.Linq;
+﻿using System;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -7,18 +7,18 @@ namespace ZLibDotNet.UnitTests;
 [TestClass]
 public class ExampleTests
 {
-    private static readonly byte[] s_inputData = Encoding.ASCII.GetBytes("hello, hello!");
-
     [TestMethod]
     public void CompressAndUncompress()
     {
+        ReadOnlySpan<byte> inputData = Encoding.ASCII.GetBytes("hello, hello!");
+
         // Compress
         ZLib zlib = new();
-        uint sourceLen = zlib.CompressBound((uint)s_inputData.Length);
-        byte[] compressedData = new byte[sourceLen];
+        uint sourceLen = zlib.CompressBound((uint)inputData.Length);
+        Span<byte> compressedData = new byte[sourceLen];
         ZStream zStream = new()
         {
-            Input = s_inputData,
+            Input = inputData,
             Output = compressedData
         };
         _ = zlib.DeflateInit(ref zStream, Z_DEFAULT_COMPRESSION);
@@ -26,12 +26,12 @@ public class ExampleTests
         _ = zlib.DeflateEnd(ref zStream);
 
         // Uncompress
-        byte[] uncomressedData = new byte[s_inputData.Length];
+        Span<byte> uncomressedData = new byte[inputData.Length];
         zStream.Input = compressedData;
         zStream.Output = uncomressedData;
         _ = zlib.InflateInit(ref zStream);
         _ = zlib.Inflate(ref zStream, Z_SYNC_FLUSH);
 
-        Assert.IsTrue(Enumerable.SequenceEqual(s_inputData, uncomressedData));
+        Assert.IsTrue(MemoryExtensions.SequenceEqual(inputData, uncomressedData));
     }
 }

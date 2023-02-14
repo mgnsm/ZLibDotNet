@@ -9,9 +9,9 @@ namespace ZLibDotNet.Deflate;
 
 internal static partial class Deflater
 {
-    internal static int DeflateSetDictionary(ref ZStream strm, byte[] dictionary, uint dictLength)
+    internal static int DeflateSetDictionary(ref ZStream strm, ReadOnlySpan<byte> dictionary)
     {
-        if (DeflateStateCheck(ref strm) || dictionary == null)
+        if (DeflateStateCheck(ref strm))
             return Z_STREAM_ERROR;
         DeflateState s = strm.deflateState;
 
@@ -19,9 +19,10 @@ internal static partial class Deflater
         if (wrap == 2 || wrap == 1 && s.status != InitState || s.lookahead != 0)
             return Z_STREAM_ERROR;
 
+        uint dictLength = (uint)dictionary.Length;
         // when using zlib wrappers, compute Adler-32 for provided dictionary
         if (wrap == 1)
-            strm.Adler = Adler32.Update(strm.Adler, ref MemoryMarshal.GetReference(dictionary.AsSpan()), dictLength);
+            strm.Adler = Adler32.Update(strm.Adler, ref MemoryMarshal.GetReference(dictionary), dictLength);
         s.wrap = 0; // avoid computing Adler-32 in ReadBuf
 
         uint next_in = 0;
