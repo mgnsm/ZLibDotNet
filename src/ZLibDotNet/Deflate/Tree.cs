@@ -102,9 +102,9 @@ internal static class Tree
         s.bits_sent = 0;
 #endif
         // Initialize the first block of the first file:
-        InitBlock(s, ref MemoryMarshal.GetReference(s.dyn_ltree.AsSpan()),
-            ref MemoryMarshal.GetReference(s.dyn_dtree.AsSpan()),
-            ref MemoryMarshal.GetReference(s.bl_tree.AsSpan()));
+        InitBlock(s, ref MemoryMarshal.GetReference<TreeNode>(s.dyn_ltree),
+            ref MemoryMarshal.GetReference<TreeNode>(s.dyn_dtree),
+            ref MemoryMarshal.GetReference<TreeNode>(s.bl_tree));
     }
 
     /// <summary>
@@ -132,7 +132,7 @@ internal static class Tree
     internal static void Align(DeflateState s, ref byte pending_buf)
     {
         SendBits(s, StaticTrees << 1, 3, ref pending_buf);
-        SendCode(s, ref Unsafe.Add(ref MemoryMarshal.GetReference(s_ltree.AsSpan()), EndBlock), ref pending_buf);
+        SendCode(s, ref Unsafe.Add(ref MemoryMarshal.GetReference<TreeNode>(s_ltree), EndBlock), ref pending_buf);
 #if DEBUG
         s.compressed_len += 10U; // 3 for block type, 7 for EOB
 #endif
@@ -204,8 +204,8 @@ internal static class Tree
         else if (static_lenb == opt_lenb)
         {
             SendBits(s, (StaticTrees << 1) + last, 3, ref pending_buf);
-            CompressBlock(s, ref MemoryMarshal.GetReference(s_ltree.AsSpan()),
-                ref MemoryMarshal.GetReference(s_dtree.AsSpan()), ref pending_buf, ref dist_code, ref length_code,
+            CompressBlock(s, ref MemoryMarshal.GetReference<TreeNode>(s_ltree),
+                ref MemoryMarshal.GetReference<TreeNode>(s_dtree), ref pending_buf, ref dist_code, ref length_code,
                 ref base_dist, ref base_length, ref extra_dbits, ref extra_lbits);
 #if DEBUG
             s.compressed_len += 3 + s.static_len;
@@ -382,9 +382,9 @@ internal static class Tree
         uint elems = desc.stat_desc.elems;
         int max_code = -1; // largest code with non zero frequency
         uint node;         // new node being created
-        ref TreeNode tree = ref MemoryMarshal.GetReference(desc.dyn_tree.AsSpan());
+        ref TreeNode tree = ref MemoryMarshal.GetReference<TreeNode>(desc.dyn_tree);
         ref TreeNode stree = ref desc.stat_desc.static_tree == null ? ref netUnsafe.NullRef<TreeNode>()
-            : ref MemoryMarshal.GetReference(desc.stat_desc.static_tree.AsSpan());
+            : ref MemoryMarshal.GetReference<TreeNode>(desc.stat_desc.static_tree);
 
         /* Construct the initial heap, with least frequent element in
          * heap[SMALLEST]. The sons of heap[n] are heap[2*n] and heap[2*n+1].
@@ -527,10 +527,10 @@ internal static class Tree
         uint n;             // iterate over the tree elements
         uint bits;          // bit length
         int overflow = 0;   // number of elements with bit length too large
-        ref TreeNode tree = ref MemoryMarshal.GetReference(desc.dyn_tree.AsSpan());
+        ref TreeNode tree = ref MemoryMarshal.GetReference<TreeNode>(desc.dyn_tree);
         ref TreeNode stree = ref desc.stat_desc.static_tree == null ? ref netUnsafe.NullRef<TreeNode>()
-            : ref MemoryMarshal.GetReference(desc.stat_desc.static_tree.AsSpan());
-        ref int extra = ref MemoryMarshal.GetReference(desc.stat_desc.extra_bits.AsSpan());
+            : ref MemoryMarshal.GetReference<TreeNode>(desc.stat_desc.static_tree);
+        ref int extra = ref MemoryMarshal.GetReference<int>(desc.stat_desc.extra_bits);
 
         netUnsafe.InitBlock(ref netUnsafe.As<ushort, byte>(ref bl_count), 0, MaxBits * sizeof(ushort));
 
@@ -639,7 +639,7 @@ internal static class Tree
             // Now reverse the bits
             Unsafe.Add(ref tree, n).fc = (ushort)BiReverse(Unsafe.Add(ref next_code, len)++, len);
 #if DEBUG
-            Trace.Tracecv(!netUnsafe.AreSame(ref tree, ref MemoryMarshal.GetReference(s_ltree.AsSpan())),
+            Trace.Tracecv(!netUnsafe.AreSame(ref tree, ref MemoryMarshal.GetReference<TreeNode>(s_ltree)),
                 $"\nn {n,3} {(IsGraph(n) ? Convert.ToChar(n) : ' ')} l {len,2} c {Unsafe.Add(ref tree, n).dl,4:x} ({Unsafe.Add(ref next_code, len) - 1:x)}) ");
 #endif
         }

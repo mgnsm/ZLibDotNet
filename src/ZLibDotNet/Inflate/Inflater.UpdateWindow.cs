@@ -1,7 +1,6 @@
 ﻿// Original code and comments Copyright (C) 1995-2022 Mark Adler
 // Managed C#/.NET code Copyright (C) 2022-2023 Magnus Montin
 
-using System;
 using System.Buffers;
 using System.Runtime.InteropServices;
 
@@ -24,7 +23,7 @@ internal static partial class Inflater
             state.whave = 0;
         }
 
-        ref byte window = ref MemoryMarshal.GetReference(state.window.AsSpan());
+        ref byte window = ref MemoryMarshal.GetReference<byte>(state.window);
         // copy state.wsize or less output bytes into the circular window
         if (copy >= state.wsize)
         {

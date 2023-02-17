@@ -1,7 +1,6 @@
 ﻿// Original code and comments Copyright (C) 1995-2022 Jean-loup Gailly and Mark Adler
 // Managed C#/.NET code Copyright (C) 2022-2023 Magnus Montin
 
-using System;
 using System.Runtime.InteropServices;
 
 namespace ZLibDotNet.Deflate;
@@ -19,7 +18,7 @@ internal static partial class Deflater
         if (level < 0 || level > 9 || strategy < 0 || strategy > Z_FIXED)
             return Z_STREAM_ERROR;
 
-        ref Config configuration_table = ref MemoryMarshal.GetReference(s_configuration_table.AsSpan());
+        ref Config configuration_table = ref MemoryMarshal.GetReference<Config>(s_configuration_table);
         Config.DeflateType deflate_type = Unsafe.Add(ref configuration_table, (uint)s.level).deflate_type;
         ref Config config = ref Unsafe.Add(ref configuration_table, (uint)level);
         if ((strategy != s.strategy || deflate_type != config.deflate_type)
@@ -37,7 +36,7 @@ internal static partial class Deflater
             if (s.level == 0 && s.matches != 0)
             {
                 if (s.matches == 1)
-                    SlideHash(s, ref MemoryMarshal.GetReference(s.head.AsSpan()));
+                    SlideHash(s, ref MemoryMarshal.GetReference<ushort>(s.head));
                 else
                     ClearHash(s.head);
                 s.matches = 0;

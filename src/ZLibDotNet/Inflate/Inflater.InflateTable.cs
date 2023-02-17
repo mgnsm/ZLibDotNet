@@ -95,10 +95,10 @@ internal static partial class Inflater
             if (Unsafe.Add(ref lens, sym) != 0)
                 Unsafe.Add(ref work, (uint)Unsafe.Add(ref ptrToOffs, (uint)Unsafe.Add(ref lens, sym))++) = (ushort)sym;
 
-        ref ushort lbase = ref MemoryMarshal.GetReference(s_lbase.AsSpan());
-        ref ushort lext = ref MemoryMarshal.GetReference(s_lext.AsSpan());
-        ref ushort dbase = ref MemoryMarshal.GetReference(s_dbase.AsSpan());
-        ref ushort dext = ref MemoryMarshal.GetReference(s_dext.AsSpan());
+        ref ushort lbase = ref MemoryMarshal.GetReference<ushort>(s_lbase);
+        ref ushort lext = ref MemoryMarshal.GetReference<ushort>(s_lext);
+        ref ushort dbase = ref MemoryMarshal.GetReference<ushort>(s_dbase);
+        ref ushort dext = ref MemoryMarshal.GetReference<ushort>(s_dext);
         ref ushort @base = ref netUnsafe.NullRef<ushort>(); // base value table to use
         ref ushort extra = ref netUnsafe.NullRef<ushort>(); // extra bits table to use
         uint match; // use base and extra for symbol >= match

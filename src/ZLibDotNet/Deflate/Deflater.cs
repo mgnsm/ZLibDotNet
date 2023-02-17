@@ -143,7 +143,7 @@ internal static partial class Deflater
 
         s.sym_end = (s.lit_bufsize - 1) * 3;
 
-        ref byte pending_buf = ref MemoryMarshal.GetReference(s.pending_buf.AsSpan());
+        ref byte pending_buf = ref MemoryMarshal.GetReference<byte>(s.pending_buf);
 
         // Flush as much pending output as possible
         if (s.pending != 0)
@@ -240,7 +240,7 @@ internal static partial class Deflater
                         bstate = DeflateRle(ref strm, flush, ref pending_buf);
                         break;
                     default:
-                        ref Config configuration_table = ref MemoryMarshal.GetReference(s_configuration_table.AsSpan());
+                        ref Config configuration_table = ref MemoryMarshal.GetReference<Config>(s_configuration_table);
                         Config.DeflateType type = Unsafe.Add(ref configuration_table, (uint)s.level).deflate_type;
                         bstate = type switch
                         {
@@ -417,7 +417,7 @@ internal static partial class Deflater
         uint len, left, have;
         uint last = 0;
         uint used = strm.avail_in;
-        ref byte window = ref MemoryMarshal.GetReference(s.window.AsSpan());
+        ref byte window = ref MemoryMarshal.GetReference<byte>(s.window);
         do
         {
             /* Set len to the maximum size block that we can copy directly with the
@@ -617,22 +617,22 @@ internal static partial class Deflater
     {
         DeflateState s = strm.deflateState;
         BlockState state;
-        ref byte window = ref MemoryMarshal.GetReference(s.window.AsSpan());
-        ref ushort prev = ref MemoryMarshal.GetReference(s.prev.AsSpan());
-        ref ushort head = ref MemoryMarshal.GetReference(s.head.AsSpan());
-        ref TreeNode dyn_ltree = ref MemoryMarshal.GetReference(s.dyn_ltree.AsSpan());
-        ref TreeNode dyn_dtree = ref MemoryMarshal.GetReference(s.dyn_dtree.AsSpan());
-        ref TreeNode bl_tree = ref MemoryMarshal.GetReference(s.bl_tree.AsSpan());
-        ref ushort bl_count = ref MemoryMarshal.GetReference(s.bl_count.AsSpan());
-        ref int heap = ref MemoryMarshal.GetReference(s.heap.AsSpan());
-        ref byte depth = ref MemoryMarshal.GetReference(s.depth.AsSpan());
-        ref ushort bl_order = ref MemoryMarshal.GetReference(s_bl_order.AsSpan());
-        ref byte dist_code = ref MemoryMarshal.GetReference(s_dist_code.AsSpan());
-        ref byte length_code = ref MemoryMarshal.GetReference(s_length_code.AsSpan());
-        ref int base_dist = ref MemoryMarshal.GetReference(s_base_dist.AsSpan());
-        ref int base_length = ref MemoryMarshal.GetReference(s_base_length.AsSpan());
-        ref int extra_dbits = ref MemoryMarshal.GetReference(s_extra_dbits.AsSpan());
-        ref int extra_lbits = ref MemoryMarshal.GetReference(s_extra_lbits.AsSpan());
+        ref byte window = ref MemoryMarshal.GetReference<byte>(s.window);
+        ref ushort prev = ref MemoryMarshal.GetReference<ushort>(s.prev);
+        ref ushort head = ref MemoryMarshal.GetReference<ushort>(s.head);
+        ref TreeNode dyn_ltree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_ltree);
+        ref TreeNode dyn_dtree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_dtree);
+        ref TreeNode bl_tree = ref MemoryMarshal.GetReference<TreeNode>(s.bl_tree);
+        ref ushort bl_count = ref MemoryMarshal.GetReference<ushort>(s.bl_count);
+        ref int heap = ref MemoryMarshal.GetReference<int>(s.heap);
+        ref byte depth = ref MemoryMarshal.GetReference<byte>(s.depth);
+        ref ushort bl_order = ref MemoryMarshal.GetReference<ushort>(s_bl_order);
+        ref byte dist_code = ref MemoryMarshal.GetReference<byte>(s_dist_code);
+        ref byte length_code = ref MemoryMarshal.GetReference<byte>(s_length_code);
+        ref int base_dist = ref MemoryMarshal.GetReference<int>(s_base_dist);
+        ref int base_length = ref MemoryMarshal.GetReference<int>(s_base_length);
+        ref int extra_dbits = ref MemoryMarshal.GetReference<int>(s_extra_dbits);
+        ref int extra_lbits = ref MemoryMarshal.GetReference<int>(s_extra_lbits);
         for (; ; )
         {
             // Make sure that we have a literal to write.
@@ -792,7 +792,7 @@ internal static partial class Deflater
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ClearHash(ushort[] head) =>
-        netUnsafe.InitBlock(ref netUnsafe.As<ushort, byte>(ref MemoryMarshal.GetReference(head.AsSpan())),
+        netUnsafe.InitBlock(ref netUnsafe.As<ushort, byte>(ref MemoryMarshal.GetReference<ushort>(head)),
             0, (uint)head.Length * sizeof(ushort));
 
     private static void SlideHash(DeflateState s, ref ushort head)
@@ -801,7 +801,7 @@ internal static partial class Deflater
         uint n = s.hash_size;
         uint m;
 
-        ref ushort prev = ref MemoryMarshal.GetReference(s.prev.AsSpan());
+        ref ushort prev = ref MemoryMarshal.GetReference<ushort>(s.prev);
         ref ushort p = ref Unsafe.Add(ref head, n);
         do
         {
@@ -886,22 +886,22 @@ internal static partial class Deflater
         bool bflush; // set if current block must be flushed
         BlockState state;
 
-        ref byte window = ref MemoryMarshal.GetReference(s.window.AsSpan());
-        ref ushort sprev = ref MemoryMarshal.GetReference(s.prev.AsSpan());
-        ref ushort head = ref MemoryMarshal.GetReference(s.head.AsSpan());
-        ref TreeNode dyn_ltree = ref MemoryMarshal.GetReference(s.dyn_ltree.AsSpan());
-        ref TreeNode dyn_dtree = ref MemoryMarshal.GetReference(s.dyn_dtree.AsSpan());
-        ref TreeNode bl_tree = ref MemoryMarshal.GetReference(s.bl_tree.AsSpan());
-        ref ushort bl_count = ref MemoryMarshal.GetReference(s.bl_count.AsSpan());
-        ref int heap = ref MemoryMarshal.GetReference(s.heap.AsSpan());
-        ref byte depth = ref MemoryMarshal.GetReference(s.depth.AsSpan());
-        ref ushort bl_order = ref MemoryMarshal.GetReference(s_bl_order.AsSpan());
-        ref byte dist_code = ref MemoryMarshal.GetReference(s_dist_code.AsSpan());
-        ref byte length_code = ref MemoryMarshal.GetReference(s_length_code.AsSpan());
-        ref int base_dist = ref MemoryMarshal.GetReference(s_base_dist.AsSpan());
-        ref int base_length = ref MemoryMarshal.GetReference(s_base_length.AsSpan());
-        ref int extra_dbits = ref MemoryMarshal.GetReference(s_extra_dbits.AsSpan());
-        ref int extra_lbits = ref MemoryMarshal.GetReference(s_extra_lbits.AsSpan());
+        ref byte window = ref MemoryMarshal.GetReference<byte>(s.window);
+        ref ushort sprev = ref MemoryMarshal.GetReference<ushort>(s.prev);
+        ref ushort head = ref MemoryMarshal.GetReference<ushort>(s.head);
+        ref TreeNode dyn_ltree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_ltree);
+        ref TreeNode dyn_dtree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_dtree);
+        ref TreeNode bl_tree = ref MemoryMarshal.GetReference<TreeNode>(s.bl_tree);
+        ref ushort bl_count = ref MemoryMarshal.GetReference<ushort>(s.bl_count);
+        ref int heap = ref MemoryMarshal.GetReference<int>(s.heap);
+        ref byte depth = ref MemoryMarshal.GetReference<byte>(s.depth);
+        ref ushort bl_order = ref MemoryMarshal.GetReference<ushort>(s_bl_order);
+        ref byte dist_code = ref MemoryMarshal.GetReference<byte>(s_dist_code);
+        ref byte length_code = ref MemoryMarshal.GetReference<byte>(s_length_code);
+        ref int base_dist = ref MemoryMarshal.GetReference<int>(s_base_dist);
+        ref int base_length = ref MemoryMarshal.GetReference<int>(s_base_length);
+        ref int extra_dbits = ref MemoryMarshal.GetReference<int>(s_extra_dbits);
+        ref int extra_lbits = ref MemoryMarshal.GetReference<int>(s_extra_lbits);
         for (; ; )
         {
             /* Make sure that we always have enough lookahead, except
@@ -1019,22 +1019,22 @@ internal static partial class Deflater
         bool bflush;    // set if current block must be flushed
         BlockState state;
 
-        ref byte window = ref MemoryMarshal.GetReference(s.window.AsSpan());
-        ref ushort prev = ref MemoryMarshal.GetReference(s.prev.AsSpan());
-        ref ushort head = ref MemoryMarshal.GetReference(s.head.AsSpan());
-        ref TreeNode dyn_ltree = ref MemoryMarshal.GetReference(s.dyn_ltree.AsSpan());
-        ref TreeNode dyn_dtree = ref MemoryMarshal.GetReference(s.dyn_dtree.AsSpan());
-        ref TreeNode bl_tree = ref MemoryMarshal.GetReference(s.bl_tree.AsSpan());
-        ref ushort bl_count = ref MemoryMarshal.GetReference(s.bl_count.AsSpan());
-        ref int heap = ref MemoryMarshal.GetReference(s.heap.AsSpan());
-        ref byte depth = ref MemoryMarshal.GetReference(s.depth.AsSpan());
-        ref ushort bl_order = ref MemoryMarshal.GetReference(s_bl_order.AsSpan());
-        ref byte dist_code = ref MemoryMarshal.GetReference(s_dist_code.AsSpan());
-        ref byte length_code = ref MemoryMarshal.GetReference(s_length_code.AsSpan());
-        ref int base_dist = ref MemoryMarshal.GetReference(s_base_dist.AsSpan());
-        ref int base_length = ref MemoryMarshal.GetReference(s_base_length.AsSpan());
-        ref int extra_dbits = ref MemoryMarshal.GetReference(s_extra_dbits.AsSpan());
-        ref int extra_lbits = ref MemoryMarshal.GetReference(s_extra_lbits.AsSpan());
+        ref byte window = ref MemoryMarshal.GetReference<byte>(s.window);
+        ref ushort prev = ref MemoryMarshal.GetReference<ushort>(s.prev);
+        ref ushort head = ref MemoryMarshal.GetReference<ushort>(s.head);
+        ref TreeNode dyn_ltree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_ltree);
+        ref TreeNode dyn_dtree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_dtree);
+        ref TreeNode bl_tree = ref MemoryMarshal.GetReference<TreeNode>(s.bl_tree);
+        ref ushort bl_count = ref MemoryMarshal.GetReference<ushort>(s.bl_count);
+        ref int heap = ref MemoryMarshal.GetReference<int>(s.heap);
+        ref byte depth = ref MemoryMarshal.GetReference<byte>(s.depth);
+        ref ushort bl_order = ref MemoryMarshal.GetReference<ushort>(s_bl_order);
+        ref byte dist_code = ref MemoryMarshal.GetReference<byte>(s_dist_code);
+        ref byte length_code = ref MemoryMarshal.GetReference<byte>(s_length_code);
+        ref int base_dist = ref MemoryMarshal.GetReference<int>(s_base_dist);
+        ref int base_length = ref MemoryMarshal.GetReference<int>(s_base_length);
+        ref int extra_dbits = ref MemoryMarshal.GetReference<int>(s_extra_dbits);
+        ref int extra_lbits = ref MemoryMarshal.GetReference<int>(s_extra_lbits);
         for (; ; )
         {
             /* Make sure that we always have enough lookahead, except
@@ -1185,7 +1185,7 @@ internal static partial class Deflater
 
         Debug.Assert(s.strstart <= s.window_size - MinLookAhead, "need lookahead");
 
-        ref ushort prev = ref MemoryMarshal.GetReference(s.prev.AsSpan());
+        ref ushort prev = ref MemoryMarshal.GetReference<ushort>(s.prev);
         do
         {
             Debug.Assert(cur_match < s.strstart, "no future");
@@ -1260,22 +1260,22 @@ internal static partial class Deflater
         bool bflush;    // set if current block must be flushed
         BlockState state;
 
-        ref byte window = ref MemoryMarshal.GetReference(s.window.AsSpan());
-        ref ushort prev = ref MemoryMarshal.GetReference(s.prev.AsSpan());
-        ref ushort head = ref MemoryMarshal.GetReference(s.head.AsSpan());
-        ref TreeNode dyn_ltree = ref MemoryMarshal.GetReference(s.dyn_ltree.AsSpan());
-        ref TreeNode dyn_dtree = ref MemoryMarshal.GetReference(s.dyn_dtree.AsSpan());
-        ref TreeNode bl_tree = ref MemoryMarshal.GetReference(s.bl_tree.AsSpan());
-        ref ushort bl_count = ref MemoryMarshal.GetReference(s.bl_count.AsSpan());
-        ref int heap = ref MemoryMarshal.GetReference(s.heap.AsSpan());
-        ref byte depth = ref MemoryMarshal.GetReference(s.depth.AsSpan());
-        ref ushort bl_order = ref MemoryMarshal.GetReference(s_bl_order.AsSpan());
-        ref byte dist_code = ref MemoryMarshal.GetReference(s_dist_code.AsSpan());
-        ref byte length_code = ref MemoryMarshal.GetReference(s_length_code.AsSpan());
-        ref int base_dist = ref MemoryMarshal.GetReference(s_base_dist.AsSpan());
-        ref int base_length = ref MemoryMarshal.GetReference(s_base_length.AsSpan());
-        ref int extra_dbits = ref MemoryMarshal.GetReference(s_extra_dbits.AsSpan());
-        ref int extra_lbits = ref MemoryMarshal.GetReference(s_extra_lbits.AsSpan());
+        ref byte window = ref MemoryMarshal.GetReference<byte>(s.window);
+        ref ushort prev = ref MemoryMarshal.GetReference<ushort>(s.prev);
+        ref ushort head = ref MemoryMarshal.GetReference<ushort>(s.head);
+        ref TreeNode dyn_ltree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_ltree);
+        ref TreeNode dyn_dtree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_dtree);
+        ref TreeNode bl_tree = ref MemoryMarshal.GetReference<TreeNode>(s.bl_tree);
+        ref ushort bl_count = ref MemoryMarshal.GetReference<ushort>(s.bl_count);
+        ref int heap = ref MemoryMarshal.GetReference<int>(s.heap);
+        ref byte depth = ref MemoryMarshal.GetReference<byte>(s.depth);
+        ref ushort bl_order = ref MemoryMarshal.GetReference<ushort>(s_bl_order);
+        ref byte dist_code = ref MemoryMarshal.GetReference<byte>(s_dist_code);
+        ref byte length_code = ref MemoryMarshal.GetReference<byte>(s_length_code);
+        ref int base_dist = ref MemoryMarshal.GetReference<int>(s_base_dist);
+        ref int base_length = ref MemoryMarshal.GetReference<int>(s_base_length);
+        ref int extra_dbits = ref MemoryMarshal.GetReference<int>(s_extra_dbits);
+        ref int extra_lbits = ref MemoryMarshal.GetReference<int>(s_extra_lbits);
         // Process the input block.
         for (; ; )
         {

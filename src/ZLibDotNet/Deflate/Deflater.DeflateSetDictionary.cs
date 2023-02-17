@@ -48,9 +48,9 @@ internal static partial class Deflater
         strm._input = dictionary;
         strm.next_in = next_in;
 
-        ref byte window = ref MemoryMarshal.GetReference(s.window.AsSpan());
-        ref ushort prev = ref MemoryMarshal.GetReference(s.prev.AsSpan());
-        ref ushort head = ref MemoryMarshal.GetReference(s.head.AsSpan());
+        ref byte window = ref MemoryMarshal.GetReference<byte>(s.window);
+        ref ushort prev = ref MemoryMarshal.GetReference<ushort>(s.prev);
+        ref ushort head = ref MemoryMarshal.GetReference<ushort>(s.head);
         FillWindow(ref strm, ref window, ref prev, ref head);
         while (s.lookahead >= MinMatch)
         {

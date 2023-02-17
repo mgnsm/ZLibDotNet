@@ -113,12 +113,12 @@ internal static partial class Inflater
         ref byte next = ref MemoryMarshal.GetReference(strm._input.Slice((int)strm.next_in)); // next input
         ref byte put = ref MemoryMarshal.GetReference(strm._output.Slice((int)strm.next_out)); // next output
         ref byte from = ref netUnsafe.NullRef<byte>(); // where to copy match bytes from
-        ref Code codes = ref MemoryMarshal.GetReference(state.codes.AsSpan());
-        ref ushort lens = ref MemoryMarshal.GetReference(state.lens.AsSpan());
-        ref ushort work = ref MemoryMarshal.GetReference(state.work.AsSpan());
-        ref byte window = ref MemoryMarshal.GetReference(state.window.AsSpan());
+        ref Code codes = ref MemoryMarshal.GetReference<Code>(state.codes);
+        ref ushort lens = ref MemoryMarshal.GetReference<ushort>(state.lens);
+        ref ushort work = ref MemoryMarshal.GetReference<ushort>(state.work);
+        ref byte window = ref MemoryMarshal.GetReference<byte>(state.window);
         ref Code lencode = ref netUnsafe.NullRef<Code>();
-        ref ushort order = ref MemoryMarshal.GetReference(s_order.AsSpan());
+        ref ushort order = ref MemoryMarshal.GetReference<ushort>(s_order);
         uint have = strm.avail_in;          // available input
         uint left = strm.avail_out;         // ...and output
         uint hold = strm.inflateState.hold; // bit buffer
@@ -388,7 +388,7 @@ internal static partial class Inflater
                     state.mode = InflateMode.CodeLens;
                     goto case InflateMode.CodeLens;
                 case InflateMode.CodeLens:
-                    lencode = ref MemoryMarshal.GetReference(state.lencode.AsSpan());
+                    lencode = ref MemoryMarshal.GetReference<Code>(state.lencode);
                     while (state.have < state.nlen + state.ndist)
                     {
                         for (; ; )
@@ -553,7 +553,7 @@ internal static partial class Inflater
                         break;
                     }
                     state.back = 0;
-                    lencode = ref MemoryMarshal.GetReference(state.lencode.AsSpan());
+                    lencode = ref MemoryMarshal.GetReference<Code>(state.lencode);
                     for (; ; )
                     {
                         here = Unsafe.Add(ref lencode, hold & ((1U << (state.lenbits)) - 1));
@@ -638,7 +638,7 @@ internal static partial class Inflater
                     state.mode = InflateMode.Dist;
                     goto case InflateMode.Dist;
                 case InflateMode.Dist:
-                    ref Code distcode = ref MemoryMarshal.GetReference(state.distcode.AsSpan());
+                    ref Code distcode = ref MemoryMarshal.GetReference<Code>(state.distcode);
                     for (; ; )
                     {
                         here = Unsafe.Add(ref distcode, state.diststart + (hold & ((1U << (state.distbits)) - 1)));

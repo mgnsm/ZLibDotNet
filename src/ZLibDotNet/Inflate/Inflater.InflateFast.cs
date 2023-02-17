@@ -27,8 +27,8 @@ internal static partial class Inflater
 
         ref byte @in = ref MemoryMarshal.GetReference(strm._input.Slice((int)strm.next_in));
         ref byte @out = ref MemoryMarshal.GetReference(strm._output.Slice((int)strm.next_out));
-        ref byte window = ref MemoryMarshal.GetReference(state.window.AsSpan());
-        ref Code lcode = ref MemoryMarshal.GetReference(state.lencode.AsSpan());
+        ref byte window = ref MemoryMarshal.GetReference<byte>(state.window);
+        ref Code lcode = ref MemoryMarshal.GetReference<Code>(state.lencode);
         ref Code dcode = ref MemoryMarshal.GetReference(state.distcode.AsSpan((int)state.diststart));
         ref byte from = ref netUnsafe.NullRef<byte>(); // where to copy match from
         ref Code here = ref netUnsafe.NullRef<Code>(); // retrieved table entry
