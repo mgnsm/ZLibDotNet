@@ -33,11 +33,9 @@ internal static partial class Inflater
     internal static int InflateTable(CodeType type, ref ushort lens, uint codes, ref Code table, ref int bits, ref ushort work, ref uint offset)
     {
         Code here;                          // table entry for duplication
-        const int Length = MaxBits + 1;
-        ushort[] count = new ushort[Length];// number of codes of each length
-        ushort[] offs = new ushort[Length]; // offsets in table for each length
-
-        ref ushort ptrToCount = ref MemoryMarshal.GetReference(count.AsSpan());
+        const byte Length = MaxBits + 1;
+        Span<ushort> count = stackalloc ushort[Length];// number of codes of each length
+        ref ushort ptrToCount = ref MemoryMarshal.GetReference(count);
 
         // accumulate lengths for codes (assumes lens[] all in 0..MAXBITS)
         netUnsafe.InitBlock(ref netUnsafe.As<ushort, byte>(ref ptrToCount), 0, Length * sizeof(ushort));
@@ -86,7 +84,8 @@ internal static partial class Inflater
             return -1; // incomplete set
 
         // generate offsets into symbol table for each length for sorting
-        ref ushort ptrToOffs = ref MemoryMarshal.GetReference(offs.AsSpan());
+        Span<ushort> offs = stackalloc ushort[Length]; // offsets in table for each length
+        ref ushort ptrToOffs = ref MemoryMarshal.GetReference(offs);
         Unsafe.Add(ref ptrToOffs, 1U) = 0;
         for (len = 1; len < MaxBits; len++)
             Unsafe.Add(ref ptrToOffs, len + 1) = (ushort)(Unsafe.Add(ref ptrToOffs, len) + Unsafe.Add(ref ptrToCount, len));

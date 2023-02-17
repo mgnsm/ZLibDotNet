@@ -31,12 +31,12 @@ internal static partial class Deflater
         {
             if (wrap == 0) // already empty otherwise
             {
-                Array.Clear(s.head, 0, s.head.Length);
+                ClearHash(s.head);
                 s.strstart = 0;
                 s.block_start = 0;
                 s.insert = 0;
             }
-            next_in = dictLength - s.w_size; //use the tail
+            next_in = dictLength - s.w_size; //use the tail 
             dictLength = s.w_size;
         }
 
@@ -48,15 +48,14 @@ internal static partial class Deflater
         strm._input = dictionary;
         strm.next_in = next_in;
 
-        uint str, n;
         ref byte window = ref MemoryMarshal.GetReference(s.window.AsSpan());
         ref ushort prev = ref MemoryMarshal.GetReference(s.prev.AsSpan());
         ref ushort head = ref MemoryMarshal.GetReference(s.head.AsSpan());
         FillWindow(ref strm, ref window, ref prev, ref head);
         while (s.lookahead >= MinMatch)
         {
-            str = s.strstart;
-            n = s.lookahead - (MinMatch - 1);
+            uint str = s.strstart;
+            uint n = s.lookahead - (MinMatch - 1);
             do
             {
                 UpdateHash(s, ref s.ins_h, Unsafe.Add(ref window, str + MinMatch - 1));

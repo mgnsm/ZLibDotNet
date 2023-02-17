@@ -24,7 +24,6 @@ internal static partial class Inflater
             state.whave = 0;
         }
 
-        uint dist;
         ref byte window = ref MemoryMarshal.GetReference(state.window.AsSpan());
         // copy state.wsize or less output bytes into the circular window
         if (copy >= state.wsize)
@@ -35,7 +34,7 @@ internal static partial class Inflater
         }
         else
         {
-            dist = state.wsize - state.wnext;
+            uint dist = state.wsize - state.wnext;
             if (dist > copy)
                 dist = copy;
             netUnsafe.CopyBlockUnaligned(ref Unsafe.Add(ref window, state.wnext), ref Unsafe.Subtract(ref end, copy), dist);

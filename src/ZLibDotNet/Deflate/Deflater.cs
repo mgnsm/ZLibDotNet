@@ -119,6 +119,12 @@ internal static partial class Deflater
     private static readonly ushort[] s_bl_order = // The lengths of the bit length codes are sent in order of decreasing probability, to avoid transmitting the lengths for unused bit length codes.
         new ushort[BlCodes] { 16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15 };
 
+    internal static readonly int[] s_extra_dbits = // extra bits for each distance code
+        new int[DCodes] { 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13 };
+
+    internal static readonly int[] s_extra_lbits = // extra bits for each length code
+        new int[LenghtCodes] { 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0 };
+
     internal static int Deflate(ref ZStream strm, int flush)
     {
         if (DeflateStateCheck(ref strm) || flush > Z_BLOCK || flush < 0)
@@ -218,10 +224,33 @@ internal static partial class Deflater
             || s.lookahead != 0
             || flush != Z_NO_FLUSH && s.status != FinishState)
         {
-            BlockState bstate = s.level == 0 ? DeflateStored(ref strm, flush, ref pending_buf) :
-                     s.strategy == Z_HUFFMAN_ONLY ? DeflateHuff(ref strm, flush, ref pending_buf) :
-                     s.strategy == Z_RLE ? DeflateRle(ref strm, flush, ref pending_buf) :
-                     Deflate(ref strm, flush, ref pending_buf);
+            BlockState bstate;
+            if (s.level == 0)
+            {
+                bstate = DeflateStored(ref strm, flush, ref pending_buf);
+            }
+            else
+            {
+                switch (s.strategy)
+                {
+                    case Z_HUFFMAN_ONLY:
+                        bstate = DeflateHuff(ref strm, flush, ref pending_buf);
+                        break;
+                    case Z_RLE:
+                        bstate = DeflateRle(ref strm, flush, ref pending_buf);
+                        break;
+                    default:
+                        ref Config configuration_table = ref MemoryMarshal.GetReference(s_configuration_table.AsSpan());
+                        Config.DeflateType type = Unsafe.Add(ref configuration_table, (uint)s.level).deflate_type;
+                        bstate = type switch
+                        {
+                            Config.DeflateType.Stored => DeflateStored(ref strm, flush, ref pending_buf),
+                            Config.DeflateType.Fast => DeflateFast(ref strm, flush, ref pending_buf),
+                            _ => DeflateSlow(ref strm, flush, ref pending_buf),
+                        };
+                        break;
+                }
+            }
 
             if (bstate == BlockState.FinishStarted || bstate == BlockState.FinishDone)
             {
@@ -254,7 +283,7 @@ internal static partial class Deflater
                      */
                     if (flush == Z_FULL_FLUSH)
                     {
-                        Array.Clear(s.head, 0, s.head.Length);
+                        ClearHash(s.head);
                         if (s.lookahead == 0)
                         {
                             s.strstart = 0;
@@ -305,14 +334,14 @@ internal static partial class Deflater
 
     private static void LongestMatchInit(DeflateState s)
     {
-        const int MinMatch = 3;
+        const byte MinMatch = 3;
 
         s.window_size = 2 * s.w_size;
 
-        Array.Clear(s.head, 0, s.head.Length);
+        ClearHash(s.head);
 
         // set the default configuration parameters
-        Config config = s_configuration_table[s.level];
+        ref Config config = ref s_configuration_table[s.level];
         s.max_lazy_match = config.max_lazy;
         s.good_match = config.good_length;
         s.nice_match = config.nice_length;
@@ -602,8 +631,8 @@ internal static partial class Deflater
         ref byte length_code = ref MemoryMarshal.GetReference(s_length_code.AsSpan());
         ref int base_dist = ref MemoryMarshal.GetReference(s_base_dist.AsSpan());
         ref int base_length = ref MemoryMarshal.GetReference(s_base_length.AsSpan());
-        ref int extra_dbits = ref MemoryMarshal.GetReference(Tree.s_extra_dbits.AsSpan());
-        ref int extra_lbits = ref MemoryMarshal.GetReference(Tree.s_extra_lbits.AsSpan());
+        ref int extra_dbits = ref MemoryMarshal.GetReference(s_extra_dbits.AsSpan());
+        ref int extra_lbits = ref MemoryMarshal.GetReference(s_extra_lbits.AsSpan());
         for (; ; )
         {
             // Make sure that we have a literal to write.
@@ -761,6 +790,11 @@ internal static partial class Deflater
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void ClearHash(ushort[] head) =>
+        netUnsafe.InitBlock(ref netUnsafe.As<ushort, byte>(ref MemoryMarshal.GetReference(head.AsSpan())),
+            0, (uint)head.Length * sizeof(ushort));
+
     private static void SlideHash(DeflateState s, ref ushort head)
     {
         uint wsize = s.w_size;
@@ -866,8 +900,8 @@ internal static partial class Deflater
         ref byte length_code = ref MemoryMarshal.GetReference(s_length_code.AsSpan());
         ref int base_dist = ref MemoryMarshal.GetReference(s_base_dist.AsSpan());
         ref int base_length = ref MemoryMarshal.GetReference(s_base_length.AsSpan());
-        ref int extra_dbits = ref MemoryMarshal.GetReference(Tree.s_extra_dbits.AsSpan());
-        ref int extra_lbits = ref MemoryMarshal.GetReference(Tree.s_extra_lbits.AsSpan());
+        ref int extra_dbits = ref MemoryMarshal.GetReference(s_extra_dbits.AsSpan());
+        ref int extra_lbits = ref MemoryMarshal.GetReference(s_extra_lbits.AsSpan());
         for (; ; )
         {
             /* Make sure that we always have enough lookahead, except
@@ -979,17 +1013,6 @@ internal static partial class Deflater
          ref dist_code, ref length_code);
 #endif
 
-    private static BlockState Deflate(ref ZStream strm, int flush, ref byte pending_buf)
-    {
-        Config.DeflateType type = s_configuration_table[strm.deflateState.level].deflate_type;
-        return type switch
-        {
-            Config.DeflateType.Stored => DeflateStored(ref strm, flush, ref pending_buf),
-            Config.DeflateType.Fast => DeflateFast(ref strm, flush, ref pending_buf),
-            _ => DeflateSlow(ref strm, flush, ref pending_buf),
-        };
-    }
-
     private static BlockState DeflateFast(ref ZStream strm, int flush, ref byte pending_buf)
     {
         DeflateState s = strm.deflateState;
@@ -1010,8 +1033,8 @@ internal static partial class Deflater
         ref byte length_code = ref MemoryMarshal.GetReference(s_length_code.AsSpan());
         ref int base_dist = ref MemoryMarshal.GetReference(s_base_dist.AsSpan());
         ref int base_length = ref MemoryMarshal.GetReference(s_base_length.AsSpan());
-        ref int extra_dbits = ref MemoryMarshal.GetReference(Tree.s_extra_dbits.AsSpan());
-        ref int extra_lbits = ref MemoryMarshal.GetReference(Tree.s_extra_lbits.AsSpan());
+        ref int extra_dbits = ref MemoryMarshal.GetReference(s_extra_dbits.AsSpan());
+        ref int extra_lbits = ref MemoryMarshal.GetReference(s_extra_lbits.AsSpan());
         for (; ; )
         {
             /* Make sure that we always have enough lookahead, except
@@ -1234,7 +1257,6 @@ internal static partial class Deflater
     private static BlockState DeflateSlow(ref ZStream strm, int flush, ref byte pending_buf)
     {
         DeflateState s = strm.deflateState;
-        uint hash_head; // head of hash chain
         bool bflush;    // set if current block must be flushed
         BlockState state;
 
@@ -1252,8 +1274,8 @@ internal static partial class Deflater
         ref byte length_code = ref MemoryMarshal.GetReference(s_length_code.AsSpan());
         ref int base_dist = ref MemoryMarshal.GetReference(s_base_dist.AsSpan());
         ref int base_length = ref MemoryMarshal.GetReference(s_base_length.AsSpan());
-        ref int extra_dbits = ref MemoryMarshal.GetReference(Tree.s_extra_dbits.AsSpan());
-        ref int extra_lbits = ref MemoryMarshal.GetReference(Tree.s_extra_lbits.AsSpan());
+        ref int extra_dbits = ref MemoryMarshal.GetReference(s_extra_dbits.AsSpan());
+        ref int extra_lbits = ref MemoryMarshal.GetReference(s_extra_lbits.AsSpan());
         // Process the input block.
         for (; ; )
         {
@@ -1276,7 +1298,7 @@ internal static partial class Deflater
             /* Insert the string window[strstart .. strstart+2] in the
              * dictionary, and set hash_head to the head of the hash chain:
              */
-            hash_head = 0;
+            uint hash_head = 0; // head of hash chain
             if (s.lookahead >= MinMatch)
                 InsertString(s, s.strstart, ref hash_head, ref window, ref prev, ref head);
 

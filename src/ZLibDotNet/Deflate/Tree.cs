@@ -10,7 +10,6 @@ namespace ZLibDotNet.Deflate;
 
 internal static class Tree
 {
-    private const byte MaxBlBits = 7;       // Bit length codes must not exceed MAX_BL_BITS bits
     private const uint EndBlock = 256;      // end of block literal code
     private const uint Rep_3_6 = 16;        // repeat previous bit length 3-6 times (2 bits of repeat count)
     private const uint RepZ_3_10 = 17;      // repeat a zero length 3-10 times  (3 bits of repeat count)
@@ -19,7 +18,7 @@ internal static class Tree
     private const byte StaticTrees = 1;
     private const byte DynTrees = 2;
 
-    private static readonly TreeNode[] s_dtree = new TreeNode[DCodes]
+    internal static readonly TreeNode[] s_dtree = new TreeNode[DCodes]
     {
             new TreeNode(0, 5), new TreeNode(16, 5), new TreeNode(8, 5), new TreeNode(24, 5), new TreeNode(4, 5),
             new TreeNode(20, 5), new TreeNode(12, 5), new TreeNode(28, 5), new TreeNode(2, 5), new TreeNode(18, 5),
@@ -29,7 +28,7 @@ internal static class Tree
             new TreeNode(19, 5), new TreeNode(11, 5), new TreeNode(27, 5), new TreeNode(7, 5), new TreeNode(23, 5)
     };
 
-    private static readonly TreeNode[] s_ltree = new TreeNode[LCodes + 2]
+    internal static readonly TreeNode[] s_ltree = new TreeNode[LCodes + 2]
     {
         new TreeNode(12, 8), new TreeNode(140, 8), new TreeNode(76, 8), new TreeNode(204, 8), new TreeNode(44, 8),
         new TreeNode(172, 8), new TreeNode(108, 8), new TreeNode(236, 8), new TreeNode(28, 8), new TreeNode(156, 8),
@@ -91,30 +90,11 @@ internal static class Tree
         new TreeNode(163, 8), new TreeNode(99, 8), new TreeNode(227, 8)
     };
 
-    internal static readonly int[] s_extra_dbits = // extra bits for each distance code
-        new int[DCodes] { 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13 };
-
-    internal static readonly int[] s_extra_lbits = // extra bits for each length code
-        new int[LenghtCodes] { 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0 };
-
-    private static readonly int[] s_extra_blbits = // extra bits for each bit length code
-        new int[BlCodes] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 7 };
-
-    private static readonly StaticTree s_l_desc = new(s_ltree, s_extra_lbits, Literals + 1, LCodes, MaxBits);
-
-    private static readonly StaticTree s_d_desc = new(s_dtree, s_extra_dbits, 0, DCodes, MaxBits);
-
-    private static readonly StaticTree s_bl_desc = new(null, s_extra_blbits, 0, BlCodes, MaxBlBits);
-
     /// <summary>
     /// Initializes the tree data structures for a new zlib stream.
     /// </summary>
     internal static void Init(DeflateState s)
     {
-        s.l_desc = new(s.dyn_ltree, s_l_desc);
-        s.d_desc = new(s.dyn_dtree, s_d_desc);
-        s.bl_desc = new(s.bl_tree, s_bl_desc);
-
         s.bi_buf = 0;
         s.bi_valid = 0;
 #if DEBUG
@@ -286,8 +266,8 @@ internal static class Tree
     private static void InitBlock(DeflateState s, ref TreeNode dyn_ltree, ref TreeNode dyn_dtree, ref TreeNode bl_tree)
     {
         // Initialize the trees.
-        uint n;
-        for (n = 0; n < LCodes; n++)
+        uint n = 0;
+        for (; n < LCodes; n++)
             Unsafe.Add(ref dyn_ltree, n).fc = 0;
         for (n = 0; n < DCodes; n++)
             Unsafe.Add(ref dyn_dtree, n).fc = 0;
@@ -376,10 +356,10 @@ internal static class Tree
          * 0xf3ffc07f = binary 11110011111111111100000001111111
          */
         uint black_mask = 0xf3ffc07f;
-        uint n;
+        uint n = 0;
 
         // Check for non-textual ("black-listed") bytes.
-        for (n = 0; n <= 31; n++, black_mask >>= 1)
+        for (; n <= 31; n++, black_mask >>= 1)
             if ((black_mask & 1) != 0 && Unsafe.Add(ref dyn_ltree, n).fc != 0)
                 return Z_BINARY;
 
@@ -546,8 +526,6 @@ internal static class Tree
         uint h;             // heap index
         uint n;             // iterate over the tree elements
         uint bits;          // bit length
-        int xbits;          // extra bits
-        ushort f;           // frequency
         int overflow = 0;   // number of elements with bit length too large
         ref TreeNode tree = ref MemoryMarshal.GetReference(desc.dyn_tree.AsSpan());
         ref TreeNode stree = ref desc.stat_desc.static_tree == null ? ref netUnsafe.NullRef<TreeNode>()
@@ -577,10 +555,10 @@ internal static class Tree
                 continue; // not a leaf node
 
             Unsafe.Add(ref bl_count, bits)++;
-            xbits = 0;
+            int xbits = 0; // extra bits
             if (n >= @base)
                 xbits = Unsafe.Add(ref extra, n - @base);
-            f = Unsafe.Add(ref tree, n).fc;
+            ushort f = Unsafe.Add(ref tree, n).fc; // frequency
             s.opt_len += f * (uint)(bits + xbits);
             if (desc.stat_desc.static_tree != null)
                 s.static_len += f * (uint)(Unsafe.Add(ref stree, n).dl + xbits);
@@ -636,7 +614,7 @@ internal static class Tree
     /// </summary>
     private static void GenCodes(ref TreeNode tree, int max_code, ref ushort bl_count)
     {
-        Span<ushort> next_codes = new ushort[MaxBits + 1]; // next code value for each bit length
+        Span<ushort> next_codes = stackalloc ushort[MaxBits + 1]; // next code value for each bit length
         uint code = 0;  // running code value
         ref ushort next_code = ref MemoryMarshal.GetReference(next_codes);
         /* The distribution counts are first used to generate the code values
@@ -719,7 +697,6 @@ internal static class Tree
     private static void ScanTree(ref TreeNode tree, int max_code, ref TreeNode bl_tree)
     {
         uint prevlen = uint.MaxValue; // last emitted length
-        uint curlen;                  // length of current code
         uint nextlen = tree.dl;       // length of next code
         int count = 0;                // repeat count of the current code
         int max_count = 7;            // max repeat count
@@ -734,7 +711,7 @@ internal static class Tree
 
         for (uint n = 0; n <= max_code; n++)
         {
-            curlen = nextlen;
+            uint curlen = nextlen; // length of current code
             nextlen = Unsafe.Add(ref tree, n + 1).dl;
             if (++count < max_count && curlen == nextlen)
             {
@@ -907,7 +884,6 @@ internal static class Tree
     private static void SendTree(DeflateState s, ref TreeNode tree, uint max_code, ref byte pending_buf, ref TreeNode bl_tree)
     {
         uint prevlen = uint.MaxValue;   // last emitted length
-        uint curlen;                    // length of current code
         uint nextlen = tree.dl;         // length of next code
         uint count = 0;                 // repeat count of the current code
         int max_count = 7;              // max repeat count
@@ -921,7 +897,7 @@ internal static class Tree
 
         for (uint n = 0; n <= max_code; n++)
         {
-            curlen = nextlen;
+            uint curlen = nextlen; // length of current code
             nextlen = Unsafe.Add(ref tree, n + 1).dl;
             if (++count < max_count && curlen == nextlen)
             {

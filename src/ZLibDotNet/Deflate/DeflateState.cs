@@ -10,6 +10,27 @@ namespace ZLibDotNet.Deflate;
 /// </summary>
 internal class DeflateState
 {
+    private const byte MaxBlBits = 7; // Bit length codes must not exceed MAX_BL_BITS bits
+
+    private static readonly int[] s_extra_blbits = // extra bits for each bit length code
+        new int[BlCodes] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 7 };
+
+    private static readonly StaticTree s_l_desc = new(Tree.s_ltree, Deflater.s_extra_lbits, Literals + 1, LCodes, MaxBits);
+
+    private static readonly StaticTree s_d_desc = new(Tree.s_dtree, Deflater.s_extra_dbits, 0, DCodes, MaxBits);
+
+    private static readonly StaticTree s_bl_desc = new(null, s_extra_blbits, 0, BlCodes, MaxBlBits);
+
+    /// <summary>
+    /// Creates an instance of the <see cref="DeflateState"/> class.
+    /// </summary>
+    public DeflateState()
+    {
+        l_desc = new(dyn_ltree, s_l_desc);
+        d_desc = new(dyn_dtree, s_d_desc);
+        bl_desc = new(bl_tree, s_bl_desc);
+    }
+
     internal uint pendingOutOffset;
 
     internal int status;            // as the name implies
@@ -94,21 +115,21 @@ internal class DeflateState
 
     internal int nice_match;    // Stop searching when current match exceeds this
 
-    internal TreeNode[] dyn_ltree = new TreeNode[HeapSize];        // literal and length tree
-    internal TreeNode[] dyn_dtree = new TreeNode[2 * DCodes + 1];  // distance tree
-    internal TreeNode[] bl_tree = new TreeNode[2 * BlCodes + 1];   // Huffman tree for bit lengths
+    internal readonly TreeNode[] dyn_ltree = new TreeNode[HeapSize];        // literal and length tree
+    internal readonly TreeNode[] dyn_dtree = new TreeNode[2 * DCodes + 1];  // distance tree
+    internal readonly TreeNode[] bl_tree = new TreeNode[2 * BlCodes + 1];   // Huffman tree for bit lengths
 
-    internal TreeDescriptor l_desc;     // desc. for literal tree
-    internal TreeDescriptor d_desc;     // desc. for distance tree
-    internal TreeDescriptor bl_desc;    // desc. for bit length tree
+    internal readonly TreeDescriptor l_desc;    // desc. for literal tree
+    internal readonly TreeDescriptor d_desc;    // desc. for distance tree
+    internal readonly TreeDescriptor bl_desc;   // desc. for bit length tree
 
-    internal ushort[] bl_count = new ushort[MaxBits + 1]; // number of codes at each bit length for an optimal tree
+    internal readonly ushort[] bl_count = new ushort[MaxBits + 1]; // number of codes at each bit length for an optimal tree
 
-    internal int[] heap = new int[2 * LCodes + 1];  // heap used to build the Huffman trees
+    internal readonly int[] heap = new int[2 * LCodes + 1];  // heap used to build the Huffman trees
     internal uint heap_len;                         // number of elements in the heap
     internal uint heap_max;                         // element of largest frequency
 
-    internal byte[] depth = new byte[2 * LCodes + 1]; // Depth of each subtree used as tie breaker for trees of equal frequency
+    internal readonly byte[] depth = new byte[2 * LCodes + 1]; // Depth of each subtree used as tie breaker for trees of equal frequency
 
     internal uint lit_bufsize;
     /* Size of match buffer for literals/lengths.  There are 4 reasons for

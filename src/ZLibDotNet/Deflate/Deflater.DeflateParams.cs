@@ -19,8 +19,10 @@ internal static partial class Deflater
         if (level < 0 || level > 9 || strategy < 0 || strategy > Z_FIXED)
             return Z_STREAM_ERROR;
 
-        Config.DeflateType deflate_type = s_configuration_table[s.level].deflate_type;
-        if ((strategy != s.strategy || deflate_type != s_configuration_table[level].deflate_type)
+        ref Config configuration_table = ref MemoryMarshal.GetReference(s_configuration_table.AsSpan());
+        Config.DeflateType deflate_type = Unsafe.Add(ref configuration_table, (uint)s.level).deflate_type;
+        ref Config config = ref Unsafe.Add(ref configuration_table, (uint)level);
+        if ((strategy != s.strategy || deflate_type != config.deflate_type)
             && s.last_flush != -2)
         {
             // Flush the last buffer:
@@ -37,11 +39,10 @@ internal static partial class Deflater
                 if (s.matches == 1)
                     SlideHash(s, ref MemoryMarshal.GetReference(s.head.AsSpan()));
                 else
-                    Array.Clear(s.head, 0, s.head.Length);
+                    ClearHash(s.head);
                 s.matches = 0;
             }
             s.level = level;
-            Config config = s_configuration_table[level];
             s.max_lazy_match = config.max_lazy;
             s.good_match = config.good_length;
             s.nice_match = config.nice_length;
