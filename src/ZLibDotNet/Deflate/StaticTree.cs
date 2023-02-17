@@ -3,7 +3,7 @@
 
 namespace ZLibDotNet.Deflate;
 
-internal class StaticTree
+internal sealed class StaticTree
 {
     internal readonly TreeNode[] static_tree; // static tree or null
     internal readonly int[] extra_bits;       // extra bits for each code or null

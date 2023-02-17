@@ -3,7 +3,7 @@
 
 namespace ZLibDotNet.Deflate;
 
-internal class TreeDescriptor
+internal sealed class TreeDescriptor
 {
     internal readonly TreeNode[] dyn_tree;  // the dynamic tree
     internal readonly StaticTree stat_desc; // the corresponding static tree
