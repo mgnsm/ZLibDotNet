@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Diagnostics;
+using System.Collections.Concurrent;
 using System.Threading;
 
 namespace ZLibDotNet;
@@ -11,8 +11,11 @@ namespace ZLibDotNet;
 /// <remarks>This implementation keeps a cache of retained objects. This means that if objects are returned when the pool has already reached "maximumRetained" objects they will be available to be garbage collected.</remarks>
 internal class ObjectPool<T> where T : class, new()
 {
-    private readonly ObjectWrapper[] _items;
-    private protected T _firstItem;
+    private readonly int _maxCapacity;
+    private int _numItems;
+
+    private protected readonly ConcurrentQueue<T> _items = new();
+    private protected T _fastItem;
 
     /// <summary>
     /// Creates an instance of <see cref="ObjectPool{T}"/>.
@@ -25,7 +28,7 @@ internal class ObjectPool<T> where T : class, new()
     /// </summary>
     /// <param name="maximumRetained">The maximum number of objects to retain in the pool.</param>
     public ObjectPool(int maximumRetained) =>
-        _items = new ObjectWrapper[maximumRetained - 1]; // -1 due to _firstItem
+         _maxCapacity = maximumRetained - 1;  // -1 to account for _fastItem
 
     /// <summary>
     /// Gets an object from the pool if one is available, otherwise creates one.
@@ -33,18 +36,19 @@ internal class ObjectPool<T> where T : class, new()
     /// <returns>A <typeparamref name="T"/>.</returns>
     public T Get()
     {
-        T item = _firstItem;
-        if (item == null || Interlocked.CompareExchange(ref _firstItem, null, item) != item)
+        T item = _fastItem;
+        if (item == null || Interlocked.CompareExchange(ref _fastItem, null, item) != item)
         {
-            ObjectWrapper[] items = _items;
-            for (int i = 0; i < items.Length; i++)
+            if (_items.TryDequeue(out item))
             {
-                item = items[i].Element;
-                if (item != null && Interlocked.CompareExchange(ref items[i].Element, null, item) == item)
-                    return item;
+                _ = Interlocked.Decrement(ref _numItems);
+                return item;
             }
-            item = new();
+
+            // no object available, so go get a brand new one
+            return new();
         }
+
         return item;
     }
 
@@ -54,18 +58,13 @@ internal class ObjectPool<T> where T : class, new()
     /// <param name="obj">The object to add to the pool.</param>
     public void Return(T obj)
     {
-        if (_firstItem != null || Interlocked.CompareExchange(ref _firstItem, obj, null) != null)
+        if (_fastItem != null || Interlocked.CompareExchange(ref _fastItem, obj, null) != null)
         {
-            ObjectWrapper[] items = _items;
-            for (int i = 0; i < items.Length && Interlocked.CompareExchange(ref items[i].Element, obj, null) != null; ++i)
-            { }
-        }
-    }
+            if (Interlocked.Increment(ref _numItems) <= _maxCapacity)
+                _items.Enqueue(obj);
 
-    // PERF: the struct wrapper avoids array-covariance-checks from the runtime when assigning to elements of the array.
-    [DebuggerDisplay("{Element}")]
-    private protected struct ObjectWrapper
-    {
-        public T Element;
+            // no room, clean up the count and drop the object on the floor
+            _ = Interlocked.Decrement(ref _numItems);
+        }
     }
 }
