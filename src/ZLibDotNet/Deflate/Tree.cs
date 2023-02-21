@@ -396,14 +396,15 @@ internal static class Tree
         uint n = 0;
         for (; n < elems; n++)
         {
-            if (Unsafe.Add(ref tree, n).fc != 0)
+            ref TreeNode tn = ref Unsafe.Add(ref tree, n);
+            if (tn.fc != 0)
             {
                 Unsafe.Add(ref heap, ++s.heap_len) = max_code = (int)n;
                 Unsafe.Add(ref depth, n) = 0;
             }
             else
             {
-                Unsafe.Add(ref tree, n).dl = 0;
+                tn.dl = 0;
             }
         }
 

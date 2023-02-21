@@ -8,7 +8,7 @@
  
  For example, the following command runs the benchmarks defined in the [UncompressionBenchmarks](UncompressionBenchmarks.cs) class only:
     
-     dotnet run --project tests/ZLibDotNet.Benchmarks -c Release -f net6.0 -- -f *Uncompress*
+     dotnet run --project tests/ZLibDotNet.Benchmarks -c Release -f net6.0 -- -f *.Uncompress*
 
 Please refer to [BenchmarkDotNet.org](https://benchmarkdotnet.org/index.html) to learn more about how to configure and run the benchmarks.
 
