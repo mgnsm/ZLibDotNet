@@ -11,7 +11,7 @@ namespace ZLibDotNet.Benchmarks;
 
 [MemoryDiagnoser]
 [MValueColumn]
-public class CompressionBenchmarks
+public class DeflateBenchmarks
 {
     private const int OutputBufferSize = 1000;
     private static readonly ZLib s_zlib = new();

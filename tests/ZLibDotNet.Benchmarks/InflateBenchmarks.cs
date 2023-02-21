@@ -10,7 +10,7 @@ namespace ZLibDotNet.Benchmarks;
 
 [MemoryDiagnoser]
 [MValueColumn]
-public class UncompressionBenchmarks
+public class InflateBenchmarks
 {
     private const int OutputBufferSize = 1500;
     private static readonly ZLib s_zlib = new();
