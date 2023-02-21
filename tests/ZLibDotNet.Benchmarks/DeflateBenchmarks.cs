@@ -49,7 +49,7 @@ public class DeflateBenchmarks
 
     [Benchmark]
     [ArgumentsSource(nameof(Input))]
-    public void DotNet6(byte[] input)
+    public void MsDotNet(byte[] input)
     {
         byte[] outputBuffer = ArrayPool<byte>.Shared.Rent(OutputBufferSize);
 

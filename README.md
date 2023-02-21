@@ -5,7 +5,7 @@
 A fully managed and [performant](tests/ZLibDotNet.Benchmarks) C#/.NET Standard 1.3 compatible implementation of the [zlib compression library](https://www.zlib.net/) which provides in-memory compression, decompression, and integrity checks of uncompressed data in the zlib ([RFC (Request for Comments) 1950](https://datatracker.ietf.org/doc/html/rfc1950)) and raw deflate ([RFC 1951](https://datatracker.ietf.org/doc/html/rfc1951)) data formats (but not the gzip or zip formats).
 
 ## zlib support in .NET
-If you simply want to compress or decompress data in the zlib format in a .NET application, there is a `ZLibStream` class for doing this in .NET 6:
+If you simply want to compress or decompress data in the zlib format in a .NET application, there is a `ZLibStream` class for doing this in .NET 6 and later versions:
 ```cs
 byte[] inputData = Encoding.ASCII.GetBytes("hello, hello!");
 
@@ -25,7 +25,7 @@ Debug.Assert(Enumerable.SequenceEqual(inputData, uncompressedData));
 ```
 In earlier versions of .NET, there are the `DeflateStream` and `InflateStream` classes that can be used to compress and decompress data in the raw deflate (RFC 1951) format.
 ### Why yet another zlib implementation?
-Besides being unsupported in .NET 5 and earlier versions, the `ZLibStream` class in .NET 6 also doesn't provide any functionality to retrieve information such as the total number of bytes processed and output, or the Adler-32 checksum of the data. 
+Besides being unsupported in .NET 5 and earlier versions, the `ZLibStream` class also doesn't provide any functionality to retrieve information such as the total number of bytes processed and output, or the Adler-32 checksum of the data. 
 
 There are indeed other third-party and fully managed C#/.NET libraries that already provide this functionality but ZLibDotNet was implemented during the porting of a C/C++ library to C#/.NET where it was undesirable to rely on any existing third-party software. It has been designed to provide an API surface that is very similar to the one that the original ported C library provides and also adds support for `Span<byte>` buffers.
 ## Installation
