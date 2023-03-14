@@ -128,6 +128,8 @@ internal static partial class Deflater
     private static readonly int[] s_extra_blbits = // extra bits for each bit length code
         new int[BlCodes] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 7 };
 
+    internal static void Init() => s_objectPool.Return(new DeflateState());
+
     internal static int Deflate(ref ZStream strm, int flush)
     {
         if (DeflateStateCheck(ref strm) || flush > Z_BLOCK || flush < 0)

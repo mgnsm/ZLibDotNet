@@ -99,6 +99,8 @@ internal static partial class Inflater
     // permutation of code lengths
     private static readonly ushort[] s_order = new ushort[19] { 16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15 };
 
+    internal static void Init() => s_objectPool.Return(new InflateState());
+
     internal static int Inflate(ref ZStream strm, int flush)
     {
         if (InflateStateCheck(ref strm)
