@@ -8,18 +8,15 @@ namespace ZLibDotNet.Deflate;
 /// <summary>
 /// State maintained between <see cref="ZLib.Deflate(ref ZStream, int)"/> calls.
 /// </summary>
-internal class DeflateState
+internal sealed class DeflateState
 {
     private const byte MaxBlBits = 7; // Bit length codes must not exceed MAX_BL_BITS bits
 
-    private static readonly int[] s_extra_blbits = // extra bits for each bit length code
-        new int[BlCodes] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 7 };
+    private static readonly StaticTree s_l_desc = new(Tree.s_ltree, Literals + 1, LCodes, MaxBits);
 
-    private static readonly StaticTree s_l_desc = new(Tree.s_ltree, Deflater.s_extra_lbits, Literals + 1, LCodes, MaxBits);
+    private static readonly StaticTree s_d_desc = new(Tree.s_dtree, 0, DCodes, MaxBits);
 
-    private static readonly StaticTree s_d_desc = new(Tree.s_dtree, Deflater.s_extra_dbits, 0, DCodes, MaxBits);
-
-    private static readonly StaticTree s_bl_desc = new(null, s_extra_blbits, 0, BlCodes, MaxBlBits);
+    private static readonly StaticTree s_bl_desc = new(null, 0, BlCodes, MaxBlBits);
 
     /// <summary>
     /// Creates an instance of the <see cref="DeflateState"/> class.

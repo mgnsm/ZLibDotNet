@@ -9,7 +9,7 @@ internal static partial class Deflater
     {
         int ret = DeflateResetKeep(ref strm);
         if (ret == Z_OK)
-            LongestMatchInit(strm.deflateState);
+            LongestMatchInit(ref strm);
         return ret;
     }
 
@@ -27,6 +27,10 @@ internal static partial class Deflater
         DeflateState s = strm.deflateState;
         s.pending = 0;
         s.pending_out = s.pending_buf;
+#if NET7_0_OR_GREATER
+        ref DeflateRefs refs = ref strm.deflateRefs;
+        refs.pending_out = ref refs.pending_buf;
+#endif
 
         if (s.wrap < 0)
             s.wrap = -s.wrap; // was made negative by deflate(..., Z_FINISH);
@@ -37,7 +41,7 @@ internal static partial class Deflater
 
         s.last_flush = -2;
 
-        Tree.Init(s);
+        Tree.Init(ref strm);
 
         return Z_OK;
     }

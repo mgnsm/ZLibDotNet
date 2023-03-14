@@ -38,7 +38,13 @@ internal static partial class Inflater
         }
 
         // search available input
-        uint @in = SyncSearch(ref state.have, ref MemoryMarshal.GetReference(strm._input.Slice((int)strm.next_in)), strm.avail_in);
+        uint @in = SyncSearch(ref state.have, ref
+#if NET7_0_OR_GREATER
+            Unsafe.Add(ref strm.input_ptr, strm.next_in),
+#else
+            MemoryMarshal.GetReference(strm._input.Slice((int)strm.next_in)),
+#endif
+                strm.avail_in);
         strm.avail_in -= @in;
         strm.next_in += @in;
         strm.total_in += @in;

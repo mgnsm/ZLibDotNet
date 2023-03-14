@@ -31,7 +31,7 @@ internal static partial class Deflater
         {
             if (wrap == 0) // already empty otherwise
             {
-                ClearHash(s.head);
+                ClearHash(ref strm);
                 s.strstart = 0;
                 s.block_start = 0;
                 s.insert = 0;
@@ -42,15 +42,40 @@ internal static partial class Deflater
 
         // insert dictionary into window and hash
         uint avail = strm.avail_in;
-        ReadOnlySpan<byte> input = strm._input;
         uint next = strm.next_in;
+        ReadOnlySpan<byte> input = strm._input;
+#if NET7_0_OR_GREATER
+        ref byte input_ptr = ref strm.input_ptr;
+        strm.Input = dictionary;
+        ref DeflateRefs refs = ref strm.deflateRefs;
+        if (netUnsafe.IsNullRef(ref refs.window))
+            refs.window = ref MemoryMarshal.GetReference<byte>(s.window);
+        if (netUnsafe.IsNullRef(ref refs.prev))
+            refs.prev = ref MemoryMarshal.GetReference<ushort>(s.prev);
+#else
         strm.avail_in = dictLength;
         strm._input = dictionary;
+#endif
         strm.next_in = next_in;
 
-        ref byte window = ref MemoryMarshal.GetReference<byte>(s.window);
-        ref ushort prev = ref MemoryMarshal.GetReference<ushort>(s.prev);
-        ref ushort head = ref MemoryMarshal.GetReference<ushort>(s.head);
+        ref byte window = ref
+#if NET7_0_OR_GREATER
+        refs.window;
+#else
+        MemoryMarshal.GetReference<byte>(s.window);
+#endif
+        ref ushort prev = ref
+#if NET7_0_OR_GREATER
+        refs.prev;
+#else
+        MemoryMarshal.GetReference<ushort>(s.prev);
+#endif
+        ref ushort head = ref
+#if NET7_0_OR_GREATER
+        refs.head;
+#else
+        MemoryMarshal.GetReference<ushort>(s.head);
+#endif
         FillWindow(ref strm, ref window, ref prev, ref head);
         while (s.lookahead >= MinMatch)
         {
@@ -75,6 +100,9 @@ internal static partial class Deflater
         s.match_length = s.prev_length = MinMatch - 1;
         s.match_available = false;
         strm._input = input;
+#if NET7_0_OR_GREATER
+        strm.input_ptr = ref input_ptr;
+#endif
         strm.next_in = next;
         strm.avail_in = avail;
         s.wrap = wrap;

@@ -4,6 +4,7 @@ using System;
 using System.Text;
 using System.IO;
 using ZLibDotNet.Inflate;
+using System.Runtime.InteropServices;
 
 namespace ZLibDotNet.UnitTests;
 
@@ -456,15 +457,21 @@ public class InflateTests
         ref ushort ptrToLens = ref lens[0];
         ref ushort ptrToWork = ref work[0];
         ref Code ptrToTable = ref table[0];
+        ref ushort lbase = ref MemoryMarshal.GetReference<ushort>(Inflater.s_lbase);
+        ref ushort lext = ref MemoryMarshal.GetReference<ushort>(Inflater.s_lext);
+        ref ushort dbase = ref MemoryMarshal.GetReference<ushort>(Inflater.s_dbase);
+        ref ushort dext = ref MemoryMarshal.GetReference<ushort>(Inflater.s_dext);
 
         // Call InflateTable() directly in order to manifest not-enough errors, since zlib ensures that enough is always enough.
         ref Code next = ref ptrToTable;
         uint offset = 0;
-        Assert.AreEqual(1, Inflater.InflateTable(CodeType.Dists, ref ptrToLens, 16, ref next, ref bits, ref ptrToWork, ref offset));
+        Assert.AreEqual(1, Inflater.InflateTable(CodeType.Dists, ref ptrToLens, 16, ref next, ref bits, ref ptrToWork, ref offset,
+           ref lbase, ref lext, ref dbase, ref dext));
 
         next = ptrToTable;
         bits = 1;
-        Assert.AreEqual(1, Inflater.InflateTable(CodeType.Dists, ref ptrToLens, 16, ref next, ref bits, ref ptrToWork, ref offset));
+        Assert.AreEqual(1, Inflater.InflateTable(CodeType.Dists, ref ptrToLens, 16, ref next, ref bits, ref ptrToWork, ref offset,
+            ref lbase, ref lext, ref dbase, ref dext));
     }
 
     [TestMethod]

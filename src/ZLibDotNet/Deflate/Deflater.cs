@@ -46,7 +46,7 @@ internal static partial class Deflater
         ""
     };
 
-    private static readonly Config[] s_configuration_table = new Config[10]
+    internal static readonly Config[] s_configuration_table = new Config[10]
     {
         new Config(0, 0, 0, 0, Config.DeflateType.Stored),          // 0: store only
         new Config(4, 4, 8, 4, Config.DeflateType.Fast),            // 1: max speed, no lazy matches
@@ -119,11 +119,14 @@ internal static partial class Deflater
     private static readonly ushort[] s_bl_order = // The lengths of the bit length codes are sent in order of decreasing probability, to avoid transmitting the lengths for unused bit length codes.
         new ushort[BlCodes] { 16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15 };
 
-    internal static readonly int[] s_extra_dbits = // extra bits for each distance code
+    private static readonly int[] s_extra_dbits = // extra bits for each distance code
         new int[DCodes] { 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13 };
 
-    internal static readonly int[] s_extra_lbits = // extra bits for each length code
+    private static readonly int[] s_extra_lbits = // extra bits for each length code
         new int[LenghtCodes] { 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0 };
+
+    private static readonly int[] s_extra_blbits = // extra bits for each bit length code
+        new int[BlCodes] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 7 };
 
     internal static int Deflate(ref ZStream strm, int flush)
     {
@@ -143,12 +146,26 @@ internal static partial class Deflater
 
         s.sym_end = (s.lit_bufsize - 1) * 3;
 
-        ref byte pending_buf = ref MemoryMarshal.GetReference<byte>(s.pending_buf);
+#if NET7_0_OR_GREATER
+        ref DeflateRefs refs = ref strm.deflateRefs;
+#endif
+        ref byte pending_buf = ref
+#if NET7_0_OR_GREATER
+            refs.pending_buf;
+#else
+            MemoryMarshal.GetReference<byte>(s.pending_buf);
+#endif
+        ref byte pending_out = ref
+#if NET7_0_OR_GREATER
+            refs.pending_out;
+#else
+            MemoryMarshal.GetReference<byte>(s.pending_out);
+#endif
 
         // Flush as much pending output as possible
         if (s.pending != 0)
         {
-            FlushPending(ref strm, ref pending_buf);
+            FlushPending(ref strm, ref pending_buf, ref pending_out);
             if (strm.avail_out == 0)
             {
                 /* Since avail_out is 0, deflate will be called again with
@@ -211,7 +228,7 @@ internal static partial class Deflater
             s.status = BusyState;
 
             // Compression must start with an empty pending buffer
-            FlushPending(ref strm, ref pending_buf);
+            FlushPending(ref strm, ref pending_buf, ref pending_out);
             if (s.pending != 0)
             {
                 s.last_flush = -1;
@@ -227,26 +244,33 @@ internal static partial class Deflater
             BlockState bstate;
             if (s.level == 0)
             {
-                bstate = DeflateStored(ref strm, flush, ref pending_buf);
+                bstate = DeflateStored(ref strm, flush, ref pending_buf, ref pending_out);
             }
             else
             {
                 switch (s.strategy)
                 {
                     case Z_HUFFMAN_ONLY:
-                        bstate = DeflateHuff(ref strm, flush, ref pending_buf);
+                        bstate = DeflateHuff(ref strm, flush, ref pending_buf, ref pending_out);
                         break;
                     case Z_RLE:
-                        bstate = DeflateRle(ref strm, flush, ref pending_buf);
+                        bstate = DeflateRle(ref strm, flush, ref pending_buf, ref pending_out);
                         break;
                     default:
-                        ref Config configuration_table = ref MemoryMarshal.GetReference<Config>(s_configuration_table);
+                        ref Config configuration_table = ref
+#if NET7_0_OR_GREATER
+                            refs.configuration_table;
+#else
+                            MemoryMarshal.GetReference<Config>(s_configuration_table);
+#endif
                         Config.DeflateType type = Unsafe.Add(ref configuration_table, (uint)s.level).deflate_type;
                         bstate = type switch
                         {
-                            Config.DeflateType.Stored => DeflateStored(ref strm, flush, ref pending_buf),
-                            Config.DeflateType.Fast => DeflateFast(ref strm, flush, ref pending_buf),
-                            _ => DeflateSlow(ref strm, flush, ref pending_buf),
+                            Config.DeflateType.Stored => DeflateStored(ref strm, flush, ref pending_buf,
+                                ref pending_out),
+                            Config.DeflateType.Fast => DeflateFast(ref strm, flush, ref pending_buf,
+                                ref pending_out),
+                            _ => DeflateSlow(ref strm, flush, ref pending_buf, ref pending_out),
                         };
                         break;
                 }
@@ -273,7 +297,17 @@ internal static partial class Deflater
             {
                 if (flush == Z_PARTIAL_FLUSH)
                 {
-                    Tree.Align(s, ref pending_buf);
+#if NET7_0_OR_GREATER
+                    if (netUnsafe.IsNullRef(ref refs.sta_ltree))
+                        refs.sta_ltree = ref MemoryMarshal.GetReference<TreeNode>(Tree.s_ltree);
+#endif
+                    Tree.Align(s, ref pending_buf, ref
+#if NET7_0_OR_GREATER
+                        refs.sta_ltree
+#else
+                        MemoryMarshal.GetReference<TreeNode>(Tree.s_ltree)
+#endif
+                    );
                 }
                 else if (flush != Z_BLOCK) // FULL_FLUSH or SYNC_FLUSH
                 {
@@ -283,7 +317,7 @@ internal static partial class Deflater
                      */
                     if (flush == Z_FULL_FLUSH)
                     {
-                        ClearHash(s.head);
+                        ClearHash(ref strm);
                         if (s.lookahead == 0)
                         {
                             s.strstart = 0;
@@ -292,7 +326,7 @@ internal static partial class Deflater
                         }
                     }
                 }
-                FlushPending(ref strm, ref pending_buf);
+                FlushPending(ref strm, ref pending_buf, ref pending_out);
                 if (strm.avail_out == 0)
                 {
                     s.last_flush = -1; // avoid BUF_ERROR at next call, see above
@@ -310,7 +344,7 @@ internal static partial class Deflater
         PutShort(s, strm.Adler >> 16, ref pending_buf);
         PutShort(s, strm.Adler & 0xffff, ref pending_buf);
 
-        FlushPending(ref strm, ref pending_buf);
+        FlushPending(ref strm, ref pending_buf, ref pending_out);
 
         // If avail_out is zero, the application will call deflate again to flush the rest.
         if (s.wrap > 0)
@@ -332,16 +366,23 @@ internal static partial class Deflater
                 && s.status != FinishState;
     }
 
-    private static void LongestMatchInit(DeflateState s)
+    private static void LongestMatchInit(ref ZStream strm)
     {
         const byte MinMatch = 3;
 
+        DeflateState s = strm.deflateState;
         s.window_size = 2 * s.w_size;
 
-        ClearHash(s.head);
+        ClearHash(ref strm);
 
         // set the default configuration parameters
-        ref Config config = ref s_configuration_table[s.level];
+        ref Config configuration_table = ref
+#if NET7_0_OR_GREATER
+            strm.deflateRefs.configuration_table;
+#else
+            MemoryMarshal.GetReference<Config>(s_configuration_table);
+#endif
+        ref Config config = ref Unsafe.Add(ref configuration_table, (uint)s.level);
         s.max_lazy_match = config.max_lazy;
         s.good_match = config.good_length;
         s.nice_match = config.nice_length;
@@ -363,7 +404,7 @@ internal static partial class Deflater
         return err;
     }
 
-    private static void FlushPending(ref ZStream strm, ref byte pending_buf)
+    private static void FlushPending(ref ZStream strm, ref byte pending_buf, ref byte pending_out)
     {
         DeflateState s = strm.deflateState;
         Tree.FlushBits(s, ref pending_buf);
@@ -373,14 +414,21 @@ internal static partial class Deflater
         if (len == 0)
             return;
 
-        netUnsafe.CopyBlockUnaligned(ref MemoryMarshal.GetReference(strm._output.Slice((int)strm.next_out)),
-            ref MemoryMarshal.GetReference(s.pending_out.AsSpan((int)s.pendingOutOffset)), len);
+        netUnsafe.CopyBlockUnaligned(ref
+#if NET7_0_OR_GREATER
+            Unsafe.Add(ref strm.output_ptr, strm.next_out),
+#else
+            MemoryMarshal.GetReference(strm._output.Slice((int)strm.next_out)),
+#endif
+            ref Unsafe.Add(ref pending_out, s.pendingOutOffset),
+            len);
+
         strm.next_out += len;
         s.pendingOutOffset += len;
         s.pending -= len;
         if (s.pending == 0)
         {
-            s.pending_out = s.pending_buf;
+            //s.pending_out = s.pending_buf;
             s.pendingOutOffset = 0;
         }
 
@@ -401,7 +449,7 @@ internal static partial class Deflater
         Unsafe.Add(ref pending_buf, s.pending++) = (byte)(b & 0xff);
     }
 
-    private static BlockState DeflateStored(ref ZStream strm, int flush, ref byte pending_buf)
+    private static BlockState DeflateStored(ref ZStream strm, int flush, ref byte pending_buf, ref byte pending_out)
     {
         DeflateState s = strm.deflateState;
         /* Smallest worthy block size when not flushing or finishing. By default
@@ -417,7 +465,23 @@ internal static partial class Deflater
         uint len, left, have;
         uint last = 0;
         uint used = strm.avail_in;
-        ref byte window = ref MemoryMarshal.GetReference<byte>(s.window);
+#if NET7_0_OR_GREATER
+        ref DeflateRefs refs = ref strm.deflateRefs;
+        if (netUnsafe.IsNullRef(ref refs.window))
+            refs.window = ref MemoryMarshal.GetReference<byte>(s.window);
+#endif
+        ref byte window = ref
+#if NET7_0_OR_GREATER
+            refs.window;
+#else
+            MemoryMarshal.GetReference<byte>(s.window);
+#endif
+        ref byte next_out = ref
+#if NET7_0_OR_GREATER
+            strm.output_ptr;
+#else
+            MemoryMarshal.GetReference(strm._output);
+#endif
         do
         {
             /* Set len to the maximum size block that we can copy directly with the
@@ -459,14 +523,13 @@ internal static partial class Deflater
             Unsafe.Add(ref pending_buf, s.pending - 1) = (byte)(~len >> 8);
 
             // Write the stored block header bytes.
-            FlushPending(ref strm, ref pending_buf);
+            FlushPending(ref strm, ref pending_buf, ref pending_out);
 #if DEBUG
             // Update debugging counts for the data about to be copied.
             s.compressed_len += len << 3;
             s.bits_sent += len << 3;
 #endif
             // Copy uncompressed bytes from the window to next_out.
-            ref byte next_out = ref MemoryMarshal.GetReference(strm._output);
             if (left != 0)
             {
                 if (left > len)
@@ -499,7 +562,12 @@ internal static partial class Deflater
         used -= strm.avail_in; // number of input bytes directly copied
         if (used != 0)
         {
-            ref byte next_in = ref MemoryMarshal.GetReference(strm._input.Slice((int)strm.next_in));
+            ref byte next_in = ref
+#if NET7_0_OR_GREATER
+                Unsafe.Add(ref strm.input_ptr, strm.next_in);
+#else
+                MemoryMarshal.GetReference(strm._input.Slice((int)strm.next_in));
+#endif
             /* If any input was used, then no unused input remains in the window,
              * therefore s.block_start == s.strstart.
              */
@@ -585,7 +653,7 @@ internal static partial class Deflater
             last = flush == Z_FINISH && strm.avail_in == 0 && len == left ? 1U : 0U;
             Tree.StoredBlock(s, ref Unsafe.Add(ref window, (uint)s.block_start), len, last, ref pending_buf);
             s.block_start += (int)len;
-            FlushPending(ref strm, ref pending_buf);
+            FlushPending(ref strm, ref pending_buf, ref pending_out);
         }
 
         // We've done all we can with the available input and output.
@@ -603,7 +671,13 @@ internal static partial class Deflater
 
         strm.avail_in -= len;
 
-        netUnsafe.CopyBlockUnaligned(ref buf, ref MemoryMarshal.GetReference(strm._input.Slice((int)strm.next_in)), len);
+        netUnsafe.CopyBlockUnaligned(ref buf, ref
+#if NET7_0_OR_GREATER
+            Unsafe.Add(ref strm.input_ptr, strm.next_in),
+#else
+            MemoryMarshal.GetReference(strm._input.Slice((int)strm.next_in)),
+#endif
+                len);
         if (strm.deflateState.wrap == 1)
             strm.Adler = Adler32.Update(strm.Adler, ref buf, len);
 
@@ -613,26 +687,129 @@ internal static partial class Deflater
         return len;
     }
 
-    private static BlockState DeflateHuff(ref ZStream strm, int flush, ref byte pending_buf)
+    private static BlockState DeflateHuff(ref ZStream strm, int flush, ref byte pending_buf, ref byte pending_out)
     {
         DeflateState s = strm.deflateState;
+#if NET7_0_OR_GREATER
+        ref DeflateRefs refs = ref strm.deflateRefs;
+        InitRefFields(s, ref refs);
+#endif
+        ref byte window = ref
+#if NET7_0_OR_GREATER
+            refs.window;
+#else
+            MemoryMarshal.GetReference<byte>(s.window);
+#endif
+        ref ushort prev = ref
+#if NET7_0_OR_GREATER
+            refs.prev;
+#else
+            MemoryMarshal.GetReference<ushort>(s.prev);
+#endif
+        ref ushort head = ref
+#if NET7_0_OR_GREATER
+            refs.head;
+#else
+            MemoryMarshal.GetReference<ushort>(s.head);
+#endif
+        ref ushort bl_count = ref
+#if NET7_0_OR_GREATER
+            refs.bl_count;
+#else
+            MemoryMarshal.GetReference<ushort>(s.bl_count);
+#endif
+        ref int heap = ref
+#if NET7_0_OR_GREATER
+            refs.heap;
+#else
+            MemoryMarshal.GetReference<int>(s.heap);
+#endif
+        ref byte depth = ref
+#if NET7_0_OR_GREATER
+            refs.depth;
+#else
+            MemoryMarshal.GetReference<byte>(s.depth);
+#endif
+
+        ref TreeNode sta_ltree = ref
+#if NET7_0_OR_GREATER
+            refs.sta_ltree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(Tree.s_ltree);
+#endif
+        ref TreeNode sta_dtree = ref
+#if NET7_0_OR_GREATER
+            refs.sta_dtree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(Tree.s_dtree);
+#endif
+        ref TreeNode dyn_ltree = ref
+#if NET7_0_OR_GREATER
+            refs.dyn_ltree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(s.dyn_ltree);
+#endif
+        ref TreeNode dyn_dtree = ref
+#if NET7_0_OR_GREATER
+            refs.dyn_dtree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(s.dyn_dtree);
+#endif
+        ref TreeNode bl_tree = ref
+#if NET7_0_OR_GREATER
+            refs.bl_tree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(s.bl_tree);
+#endif
+        ref ushort bl_order = ref
+#if NET7_0_OR_GREATER
+            refs.bl_order;
+#else
+            MemoryMarshal.GetReference<ushort>(s_bl_order);
+#endif
+        ref byte dist_code = ref
+#if NET7_0_OR_GREATER
+            refs.dist_code;
+#else
+            MemoryMarshal.GetReference<byte>(s_dist_code);
+#endif
+        ref byte length_code = ref
+#if NET7_0_OR_GREATER
+            refs.length_code;
+#else
+            MemoryMarshal.GetReference<byte>(s_length_code);
+#endif
+        ref int base_dist = ref
+#if NET7_0_OR_GREATER
+            refs.base_dist;
+#else
+            MemoryMarshal.GetReference<int>(s_base_dist);
+#endif
+        ref int base_length = ref
+#if NET7_0_OR_GREATER
+            refs.base_length;
+#else
+            MemoryMarshal.GetReference<int>(s_base_length);
+#endif
+        ref int extra_dbits = ref
+#if NET7_0_OR_GREATER
+            refs.extra_dbits;
+#else
+            MemoryMarshal.GetReference<int>(s_extra_dbits);
+#endif
+        ref int extra_lbits = ref
+#if NET7_0_OR_GREATER
+            refs.extra_lbits;
+#else
+            MemoryMarshal.GetReference<int>(s_extra_lbits);
+#endif
+        ref int extra_blbits = ref
+#if NET7_0_OR_GREATER
+            refs.extra_blbits;
+#else
+            MemoryMarshal.GetReference<int>(s_extra_blbits);
+#endif
         BlockState state;
-        ref byte window = ref MemoryMarshal.GetReference<byte>(s.window);
-        ref ushort prev = ref MemoryMarshal.GetReference<ushort>(s.prev);
-        ref ushort head = ref MemoryMarshal.GetReference<ushort>(s.head);
-        ref TreeNode dyn_ltree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_ltree);
-        ref TreeNode dyn_dtree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_dtree);
-        ref TreeNode bl_tree = ref MemoryMarshal.GetReference<TreeNode>(s.bl_tree);
-        ref ushort bl_count = ref MemoryMarshal.GetReference<ushort>(s.bl_count);
-        ref int heap = ref MemoryMarshal.GetReference<int>(s.heap);
-        ref byte depth = ref MemoryMarshal.GetReference<byte>(s.depth);
-        ref ushort bl_order = ref MemoryMarshal.GetReference<ushort>(s_bl_order);
-        ref byte dist_code = ref MemoryMarshal.GetReference<byte>(s_dist_code);
-        ref byte length_code = ref MemoryMarshal.GetReference<byte>(s_length_code);
-        ref int base_dist = ref MemoryMarshal.GetReference<int>(s_base_dist);
-        ref int base_length = ref MemoryMarshal.GetReference<int>(s_base_length);
-        ref int extra_dbits = ref MemoryMarshal.GetReference<int>(s_extra_dbits);
-        ref int extra_lbits = ref MemoryMarshal.GetReference<int>(s_extra_lbits);
         for (; ; )
         {
             // Make sure that we have a literal to write.
@@ -657,27 +834,27 @@ internal static partial class Deflater
                 ref dist_code, ref length_code);
             s.lookahead--;
             s.strstart++;
-            if (bflush && FlushBlock(ref strm, 0, ref window, out state, ref pending_buf,
-                ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap, ref depth,
-                ref bl_order, ref dist_code, ref length_code, ref base_dist, ref base_length,
-                ref extra_dbits, ref extra_lbits))
+            if (bflush && FlushBlock(ref strm, 0, ref window, out state, ref pending_buf, ref pending_out,
+                ref sta_ltree, ref sta_dtree, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count,
+                ref heap, ref depth, ref bl_order, ref dist_code, ref length_code, ref base_dist,
+                ref base_length, ref extra_dbits, ref extra_lbits, ref extra_blbits))
                 return state;
         }
 
         s.insert = 0;
         if (flush == Z_FINISH)
         {
-            if (FlushBlock(ref strm, 1, ref window, out state, ref pending_buf,
-                ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap, ref depth,
-                ref bl_order, ref dist_code, ref length_code, ref base_dist, ref base_length,
-                ref extra_dbits, ref extra_lbits))
+            if (FlushBlock(ref strm, 1, ref window, out state, ref pending_buf, ref pending_out,
+                ref sta_ltree, ref sta_dtree, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count,
+                ref heap, ref depth, ref bl_order, ref dist_code, ref length_code, ref base_dist,
+                ref base_length, ref extra_dbits, ref extra_lbits, ref extra_blbits))
                 return state;
             return BlockState.FinishDone;
         }
-        if (s.sym_next != 0 && FlushBlock(ref strm, 0, ref window, out state, ref pending_buf,
-            ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap, ref depth,
-            ref bl_order, ref dist_code, ref length_code, ref base_dist, ref base_length,
-            ref extra_dbits, ref extra_lbits))
+        if (s.sym_next != 0 && FlushBlock(ref strm, 0, ref window, out state, ref pending_buf, ref pending_out,
+            ref sta_ltree, ref sta_dtree, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count,
+            ref heap, ref depth, ref bl_order, ref dist_code, ref length_code, ref base_dist,
+            ref base_length, ref extra_dbits, ref extra_lbits, ref extra_blbits))
             return state;
 
         return BlockState.BlockDone;
@@ -706,7 +883,7 @@ internal static partial class Deflater
                 s.block_start -= (int)wsize;
                 if (s.insert > s.strstart)
                     s.insert = s.strstart;
-                SlideHash(s, ref head);
+                SlideHash(s, ref prev, ref head);
                 more += wsize;
             }
             if (strm.avail_in == 0)
@@ -791,17 +968,21 @@ internal static partial class Deflater
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void ClearHash(ushort[] head) =>
-        netUnsafe.InitBlock(ref netUnsafe.As<ushort, byte>(ref MemoryMarshal.GetReference<ushort>(head)),
-            0, (uint)head.Length * sizeof(ushort));
+    private static void ClearHash(ref ZStream strm) =>
+        netUnsafe.InitBlock(ref netUnsafe.As<ushort, byte>(ref
+#if NET7_0_OR_GREATER
+        strm.deflateRefs.head
+#else
+        MemoryMarshal.GetReference<ushort>(strm.deflateState.head)
+#endif
+        ), 0, (uint)strm.deflateState.head.Length * sizeof(ushort));
 
-    private static void SlideHash(DeflateState s, ref ushort head)
+    private static void SlideHash(DeflateState s, ref ushort prev, ref ushort head)
     {
         uint wsize = s.w_size;
         uint n = s.hash_size;
         uint m;
 
-        ref ushort prev = ref MemoryMarshal.GetReference<ushort>(s.prev);
         ref ushort p = ref Unsafe.Add(ref head, n);
         do
         {
@@ -829,30 +1010,31 @@ internal static partial class Deflater
     private static void UpdateHash(DeflateState s, ref uint h, byte c) =>
         h = (((h) << s.hash_shift) ^ c) & s.hash_mask;
 
-    private static void FlushBlockOnly(ref ZStream strm, uint last, ref byte pending_buf, ref byte window,
-        ref TreeNode dyn_ltree, ref TreeNode dyn_dtree, ref TreeNode bl_tree, ref ushort bl_count, ref int heap,
-        ref byte depth, ref ushort bl_order, ref byte dist_code, ref byte length_code, ref int base_dist, ref int base_length,
-        ref int extra_dbits, ref int extra_lbits)
+    private static void FlushBlockOnly(ref ZStream strm, uint last, ref byte pending_buf, ref byte pending_out,
+        ref byte window, ref TreeNode sta_ltree, ref TreeNode sta_dtree, ref TreeNode dyn_ltree, ref TreeNode dyn_dtree,
+        ref TreeNode bl_tree, ref ushort bl_count, ref int heap, ref byte depth, ref ushort bl_order, ref byte dist_code,
+        ref byte length_code, ref int base_dist, ref int base_length, ref int extra_dbits, ref int extra_lbits, ref int extra_blbits)
     {
         DeflateState s = strm.deflateState;
         uint block_start = (uint)s.block_start;
         ref byte buf = ref s.block_start >= 0L ? ref Unsafe.Add(ref window, block_start) : ref netUnsafe.NullRef<byte>();
         Tree.FlushBlock(ref strm, ref buf, s.strstart - block_start, last,
-            ref pending_buf, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap, ref depth, ref bl_order,
-            ref dist_code, ref length_code, ref base_dist, ref base_length, ref extra_dbits, ref extra_lbits);
+            ref pending_buf, ref sta_ltree, ref sta_dtree, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap, ref depth, ref bl_order,
+            ref dist_code, ref length_code, ref base_dist, ref base_length, ref extra_dbits, ref extra_lbits, ref extra_blbits);
         s.block_start = (int)s.strstart;
-        FlushPending(ref strm, ref pending_buf);
+        FlushPending(ref strm, ref pending_buf, ref pending_out);
         Trace.Tracev("[FLUSH]");
     }
 
     private static bool FlushBlock(ref ZStream strm, uint last, ref byte window, out BlockState state,
-        ref byte pending_buf, ref TreeNode dyn_ltree, ref TreeNode dyn_dtree, ref TreeNode bl_tree,
-        ref ushort bl_count, ref int heap, ref byte depth, ref ushort bl_order, ref byte dist_code,
-        ref byte length_code, ref int base_dist, ref int base_length, ref int extra_dbits, ref int extra_lbits)
+        ref byte pending_buf, ref byte pending_out, ref TreeNode sta_ltree, ref TreeNode sta_dtree,
+        ref TreeNode dyn_ltree, ref TreeNode dyn_dtree, ref TreeNode bl_tree, ref ushort bl_count, ref int heap,
+        ref byte depth, ref ushort bl_order, ref byte dist_code, ref byte length_code, ref int base_dist, ref int base_length,
+        ref int extra_dbits, ref int extra_lbits, ref int extra_blbits)
     {
-        FlushBlockOnly(ref strm, last, ref pending_buf, ref window, ref dyn_ltree, ref dyn_dtree, ref bl_tree,
-            ref bl_count, ref heap, ref depth, ref bl_order, ref dist_code, ref length_code, ref base_dist,
-            ref base_length, ref extra_dbits, ref extra_lbits);
+        FlushBlockOnly(ref strm, last, ref pending_buf, ref pending_out, ref window, ref sta_ltree, ref sta_dtree,
+            ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap, ref depth, ref bl_order, ref dist_code,
+            ref length_code, ref base_dist, ref base_length, ref extra_dbits, ref extra_lbits, ref extra_blbits);
         if (strm.avail_out == 0)
         {
             state = (last != 0) ? BlockState.FinishStarted : BlockState.NeedMore;
@@ -880,28 +1062,130 @@ internal static partial class Deflater
             ref dist_code, ref length_code);
 #endif
 
-    private static BlockState DeflateRle(ref ZStream strm, int flush, ref byte pending_buf)
+    private static BlockState DeflateRle(ref ZStream strm, int flush, ref byte pending_buf, ref byte pending_out)
     {
         DeflateState s = strm.deflateState;
+#if NET7_0_OR_GREATER
+        ref DeflateRefs refs = ref strm.deflateRefs;
+        InitRefFields(s, ref refs);
+#endif
+        ref byte window = ref
+#if NET7_0_OR_GREATER
+            refs.window;
+#else
+            MemoryMarshal.GetReference<byte>(s.window);
+#endif
+        ref ushort sprev = ref
+#if NET7_0_OR_GREATER
+            refs.prev;
+#else
+            MemoryMarshal.GetReference<ushort>(s.prev);
+#endif
+        ref ushort head = ref
+#if NET7_0_OR_GREATER
+            refs.head;
+#else
+            MemoryMarshal.GetReference<ushort>(s.head);
+#endif
+        ref ushort bl_count = ref
+#if NET7_0_OR_GREATER
+            refs.bl_count;
+#else
+            MemoryMarshal.GetReference<ushort>(s.bl_count);
+#endif
+        ref int heap = ref
+#if NET7_0_OR_GREATER
+            refs.heap;
+#else
+            MemoryMarshal.GetReference<int>(s.heap);
+#endif
+        ref byte depth = ref
+#if NET7_0_OR_GREATER
+            refs.depth;
+#else
+            MemoryMarshal.GetReference<byte>(s.depth);
+#endif
+
+        ref TreeNode sta_ltree = ref
+#if NET7_0_OR_GREATER
+            refs.sta_ltree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(Tree.s_ltree);
+#endif
+        ref TreeNode sta_dtree = ref
+#if NET7_0_OR_GREATER
+            refs.sta_dtree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(Tree.s_dtree);
+#endif
+        ref TreeNode dyn_ltree = ref
+#if NET7_0_OR_GREATER
+            refs.dyn_ltree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(s.dyn_ltree);
+#endif
+        ref TreeNode dyn_dtree = ref
+#if NET7_0_OR_GREATER
+            refs.dyn_dtree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(s.dyn_dtree);
+#endif
+        ref TreeNode bl_tree = ref
+#if NET7_0_OR_GREATER
+            refs.bl_tree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(s.bl_tree);
+#endif
+        ref ushort bl_order = ref
+#if NET7_0_OR_GREATER
+            refs.bl_order;
+#else
+            MemoryMarshal.GetReference<ushort>(s_bl_order);
+#endif
+        ref byte dist_code = ref
+#if NET7_0_OR_GREATER
+            refs.dist_code;
+#else
+            MemoryMarshal.GetReference<byte>(s_dist_code);
+#endif
+        ref byte length_code = ref
+#if NET7_0_OR_GREATER
+            refs.length_code;
+#else
+            MemoryMarshal.GetReference<byte>(s_length_code);
+#endif
+        ref int base_dist = ref
+#if NET7_0_OR_GREATER
+            refs.base_dist;
+#else
+            MemoryMarshal.GetReference<int>(s_base_dist);
+#endif
+        ref int base_length = ref
+#if NET7_0_OR_GREATER
+            refs.base_length;
+#else
+            MemoryMarshal.GetReference<int>(s_base_length);
+#endif
+        ref int extra_dbits = ref
+#if NET7_0_OR_GREATER
+            refs.extra_dbits;
+#else
+            MemoryMarshal.GetReference<int>(s_extra_dbits);
+#endif
+        ref int extra_lbits = ref
+#if NET7_0_OR_GREATER
+            refs.extra_lbits;
+#else
+            MemoryMarshal.GetReference<int>(s_extra_lbits);
+#endif
+        ref int extra_blbits = ref
+#if NET7_0_OR_GREATER
+            refs.extra_blbits;
+#else
+            MemoryMarshal.GetReference<int>(s_extra_blbits);
+#endif
         bool bflush; // set if current block must be flushed
         BlockState state;
-
-        ref byte window = ref MemoryMarshal.GetReference<byte>(s.window);
-        ref ushort sprev = ref MemoryMarshal.GetReference<ushort>(s.prev);
-        ref ushort head = ref MemoryMarshal.GetReference<ushort>(s.head);
-        ref TreeNode dyn_ltree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_ltree);
-        ref TreeNode dyn_dtree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_dtree);
-        ref TreeNode bl_tree = ref MemoryMarshal.GetReference<TreeNode>(s.bl_tree);
-        ref ushort bl_count = ref MemoryMarshal.GetReference<ushort>(s.bl_count);
-        ref int heap = ref MemoryMarshal.GetReference<int>(s.heap);
-        ref byte depth = ref MemoryMarshal.GetReference<byte>(s.depth);
-        ref ushort bl_order = ref MemoryMarshal.GetReference<ushort>(s_bl_order);
-        ref byte dist_code = ref MemoryMarshal.GetReference<byte>(s_dist_code);
-        ref byte length_code = ref MemoryMarshal.GetReference<byte>(s_length_code);
-        ref int base_dist = ref MemoryMarshal.GetReference<int>(s_base_dist);
-        ref int base_length = ref MemoryMarshal.GetReference<int>(s_base_length);
-        ref int extra_dbits = ref MemoryMarshal.GetReference<int>(s_extra_dbits);
-        ref int extra_lbits = ref MemoryMarshal.GetReference<int>(s_extra_lbits);
         for (; ; )
         {
             /* Make sure that we always have enough lookahead, except
@@ -966,27 +1250,27 @@ internal static partial class Deflater
                 s.lookahead--;
                 s.strstart++;
             }
-            if (bflush && FlushBlock(ref strm, 0, ref window, out state,
-                ref pending_buf, ref dyn_ltree, ref dyn_dtree, ref bl_tree,
-                ref bl_count, ref heap, ref depth, ref bl_order, ref dist_code, ref length_code,
-                ref base_dist, ref base_length, ref extra_dbits, ref extra_lbits))
+            if (bflush && FlushBlock(ref strm, 0, ref window, out state, ref pending_buf, ref pending_out,
+                ref sta_ltree, ref sta_dtree, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count,
+                ref heap, ref depth, ref bl_order, ref dist_code, ref length_code, ref base_dist,
+                ref base_length, ref extra_dbits, ref extra_lbits, ref extra_blbits))
                 return state;
         }
 
         s.insert = 0;
         if (flush == Z_FINISH)
         {
-            if (FlushBlock(ref strm, 1, ref window, out state, ref pending_buf,
-                ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap,
-                ref depth, ref bl_order, ref dist_code, ref length_code, ref base_dist,
-                ref base_length, ref extra_dbits, ref extra_lbits))
+            if (FlushBlock(ref strm, 1, ref window, out state, ref pending_buf, ref pending_out,
+                ref sta_ltree, ref sta_dtree, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count,
+                ref heap, ref depth, ref bl_order, ref dist_code, ref length_code, ref base_dist,
+                ref base_length, ref extra_dbits, ref extra_lbits, ref extra_blbits))
                 return state;
             return BlockState.FinishDone;
         }
-        if (s.sym_next != 0 && FlushBlock(ref strm, 0, ref window, out state, ref pending_buf,
-            ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap, ref depth,
-            ref bl_order, ref dist_code, ref length_code, ref base_dist, ref base_length,
-            ref extra_dbits, ref extra_lbits))
+        if (s.sym_next != 0 && FlushBlock(ref strm, 0, ref window, out state, ref pending_buf, ref pending_out,
+                ref sta_ltree, ref sta_dtree, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count,
+                ref heap, ref depth, ref bl_order, ref dist_code, ref length_code, ref base_dist,
+                ref base_length, ref extra_dbits, ref extra_lbits, ref extra_blbits))
             return state;
 
         return BlockState.BlockDone;
@@ -1013,28 +1297,130 @@ internal static partial class Deflater
          ref dist_code, ref length_code);
 #endif
 
-    private static BlockState DeflateFast(ref ZStream strm, int flush, ref byte pending_buf)
+    private static BlockState DeflateFast(ref ZStream strm, int flush, ref byte pending_buf, ref byte pending_out)
     {
         DeflateState s = strm.deflateState;
-        bool bflush;    // set if current block must be flushed
-        BlockState state;
+#if NET7_0_OR_GREATER
+        ref DeflateRefs refs = ref strm.deflateRefs;
+        InitRefFields(s, ref refs);
+#endif
+        ref byte window = ref
+#if NET7_0_OR_GREATER
+            refs.window;
+#else
+            MemoryMarshal.GetReference<byte>(s.window);
+#endif
+        ref ushort prev = ref
+#if NET7_0_OR_GREATER
+            refs.prev;
+#else
+            MemoryMarshal.GetReference<ushort>(s.prev);
+#endif
+        ref ushort head = ref
+#if NET7_0_OR_GREATER
+            refs.head;
+#else
+            MemoryMarshal.GetReference<ushort>(s.head);
+#endif
+        ref ushort bl_count = ref
+#if NET7_0_OR_GREATER
+            refs.bl_count;
+#else
+            MemoryMarshal.GetReference<ushort>(s.bl_count);
+#endif
+        ref int heap = ref
+#if NET7_0_OR_GREATER
+            refs.heap;
+#else
+            MemoryMarshal.GetReference<int>(s.heap);
+#endif
+        ref byte depth = ref
+#if NET7_0_OR_GREATER
+            refs.depth;
+#else
+            MemoryMarshal.GetReference<byte>(s.depth);
+#endif
 
-        ref byte window = ref MemoryMarshal.GetReference<byte>(s.window);
-        ref ushort prev = ref MemoryMarshal.GetReference<ushort>(s.prev);
-        ref ushort head = ref MemoryMarshal.GetReference<ushort>(s.head);
-        ref TreeNode dyn_ltree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_ltree);
-        ref TreeNode dyn_dtree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_dtree);
-        ref TreeNode bl_tree = ref MemoryMarshal.GetReference<TreeNode>(s.bl_tree);
-        ref ushort bl_count = ref MemoryMarshal.GetReference<ushort>(s.bl_count);
-        ref int heap = ref MemoryMarshal.GetReference<int>(s.heap);
-        ref byte depth = ref MemoryMarshal.GetReference<byte>(s.depth);
-        ref ushort bl_order = ref MemoryMarshal.GetReference<ushort>(s_bl_order);
-        ref byte dist_code = ref MemoryMarshal.GetReference<byte>(s_dist_code);
-        ref byte length_code = ref MemoryMarshal.GetReference<byte>(s_length_code);
-        ref int base_dist = ref MemoryMarshal.GetReference<int>(s_base_dist);
-        ref int base_length = ref MemoryMarshal.GetReference<int>(s_base_length);
-        ref int extra_dbits = ref MemoryMarshal.GetReference<int>(s_extra_dbits);
-        ref int extra_lbits = ref MemoryMarshal.GetReference<int>(s_extra_lbits);
+        ref TreeNode sta_ltree = ref
+#if NET7_0_OR_GREATER
+            refs.sta_ltree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(Tree.s_ltree);
+#endif
+        ref TreeNode sta_dtree = ref
+#if NET7_0_OR_GREATER
+            refs.sta_dtree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(Tree.s_dtree);
+#endif
+        ref TreeNode dyn_ltree = ref
+#if NET7_0_OR_GREATER
+            refs.dyn_ltree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(s.dyn_ltree);
+#endif
+        ref TreeNode dyn_dtree = ref
+#if NET7_0_OR_GREATER
+            refs.dyn_dtree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(s.dyn_dtree);
+#endif
+        ref TreeNode bl_tree = ref
+#if NET7_0_OR_GREATER
+            refs.bl_tree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(s.bl_tree);
+#endif
+        ref ushort bl_order = ref
+#if NET7_0_OR_GREATER
+            refs.bl_order;
+#else
+            MemoryMarshal.GetReference<ushort>(s_bl_order);
+#endif
+        ref byte dist_code = ref
+#if NET7_0_OR_GREATER
+            refs.dist_code;
+#else
+            MemoryMarshal.GetReference<byte>(s_dist_code);
+#endif
+        ref byte length_code = ref
+#if NET7_0_OR_GREATER
+            refs.length_code;
+#else
+            MemoryMarshal.GetReference<byte>(s_length_code);
+#endif
+        ref int base_dist = ref
+#if NET7_0_OR_GREATER
+            refs.base_dist;
+#else
+            MemoryMarshal.GetReference<int>(s_base_dist);
+#endif
+        ref int base_length = ref
+#if NET7_0_OR_GREATER
+            refs.base_length;
+#else
+            MemoryMarshal.GetReference<int>(s_base_length);
+#endif
+        ref int extra_dbits = ref
+#if NET7_0_OR_GREATER
+            refs.extra_dbits;
+#else
+            MemoryMarshal.GetReference<int>(s_extra_dbits);
+#endif
+        ref int extra_lbits = ref
+#if NET7_0_OR_GREATER
+            refs.extra_lbits;
+#else
+            MemoryMarshal.GetReference<int>(s_extra_lbits);
+#endif
+        ref int extra_blbits = ref
+#if NET7_0_OR_GREATER
+            refs.extra_blbits;
+#else
+            MemoryMarshal.GetReference<int>(s_extra_blbits);
+#endif
+        bool bflush; // set if current block must be flushed
+        BlockState state;
         for (; ; )
         {
             /* Make sure that we always have enough lookahead, except
@@ -1067,7 +1453,7 @@ internal static partial class Deflater
                  * of window index 0 (in particular we have to avoid a match
                  * of the string with itself at the start of the input file).
                  */
-                s.match_length = LongestMatch(s, hash_head, ref window);
+                s.match_length = LongestMatch(s, hash_head, ref window, ref prev);
                 // LongestMatch() sets match_start
             }
             if (s.match_length >= MinMatch)
@@ -1116,26 +1502,26 @@ internal static partial class Deflater
                 s.lookahead--;
                 s.strstart++;
             }
-            if (bflush && FlushBlock(ref strm, 0, ref window, out state, ref pending_buf,
-                ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap, ref depth,
-                ref bl_order, ref dist_code, ref length_code, ref base_dist, ref base_length,
-                ref extra_dbits, ref extra_lbits))
+            if (bflush && FlushBlock(ref strm, 0, ref window, out state, ref pending_buf, ref pending_out,
+                ref sta_ltree, ref sta_dtree, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count,
+                ref heap, ref depth, ref bl_order, ref dist_code, ref length_code, ref base_dist,
+                ref base_length, ref extra_dbits, ref extra_lbits, ref extra_blbits))
                 return state;
         }
         s.insert = s.strstart < MinMatch - 1 ? s.strstart : MinMatch - 1;
         if (flush == Z_FINISH)
         {
-            if (FlushBlock(ref strm, 1, ref window, out state, ref pending_buf,
-                ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap, ref depth,
-                ref bl_order, ref dist_code, ref length_code, ref base_dist, ref base_length,
-                ref extra_dbits, ref extra_lbits))
+            if (FlushBlock(ref strm, 1, ref window, out state, ref pending_buf, ref pending_out,
+                ref sta_ltree, ref sta_dtree, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count,
+                ref heap, ref depth, ref bl_order, ref dist_code, ref length_code, ref base_dist,
+                ref base_length, ref extra_dbits, ref extra_lbits, ref extra_blbits))
                 return state;
             return BlockState.FinishDone;
         }
-        if (s.sym_next != 0 && FlushBlock(ref strm, 0, ref window, out state, ref pending_buf,
-            ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap, ref depth,
-            ref bl_order, ref dist_code, ref length_code, ref base_dist, ref base_length,
-            ref extra_dbits, ref extra_lbits))
+        if (s.sym_next != 0 && FlushBlock(ref strm, 0, ref window, out state, ref pending_buf, ref pending_out,
+                ref sta_ltree, ref sta_dtree, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count,
+                ref heap, ref depth, ref bl_order, ref dist_code, ref length_code, ref base_dist,
+                ref base_length, ref extra_dbits, ref extra_lbits, ref extra_blbits))
             return state;
         return BlockState.BlockDone;
     }
@@ -1152,7 +1538,7 @@ internal static partial class Deflater
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static uint MaxDist(DeflateState s) => s.w_size - MinLookAhead;
 
-    private static uint LongestMatch(DeflateState s, uint cur_match, ref byte window)
+    private static uint LongestMatch(DeflateState s, uint cur_match, ref byte window, ref ushort prev)
     {
         uint chain_length = s.max_chain_length; // max hash chain length
         ref byte scan = ref Unsafe.Add(ref window, s.strstart); // current string
@@ -1185,7 +1571,6 @@ internal static partial class Deflater
 
         Debug.Assert(s.strstart <= s.window_size - MinLookAhead, "need lookahead");
 
-        ref ushort prev = ref MemoryMarshal.GetReference<ushort>(s.prev);
         do
         {
             Debug.Assert(cur_match < s.strstart, "no future");
@@ -1254,28 +1639,130 @@ internal static partial class Deflater
         return s.lookahead;
     }
 
-    private static BlockState DeflateSlow(ref ZStream strm, int flush, ref byte pending_buf)
+    private static BlockState DeflateSlow(ref ZStream strm, int flush, ref byte pending_buf, ref byte pending_out)
     {
         DeflateState s = strm.deflateState;
-        bool bflush;    // set if current block must be flushed
-        BlockState state;
+#if NET7_0_OR_GREATER
+        ref DeflateRefs refs = ref strm.deflateRefs;
+        InitRefFields(s, ref refs);
+#endif
+        ref byte window = ref
+#if NET7_0_OR_GREATER
+            refs.window;
+#else
+            MemoryMarshal.GetReference<byte>(s.window);
+#endif
+        ref ushort prev = ref
+#if NET7_0_OR_GREATER
+            refs.prev;
+#else
+            MemoryMarshal.GetReference<ushort>(s.prev);
+#endif
+        ref ushort head = ref
+#if NET7_0_OR_GREATER
+            refs.head;
+#else
+            MemoryMarshal.GetReference<ushort>(s.head);
+#endif
+        ref ushort bl_count = ref
+#if NET7_0_OR_GREATER
+            refs.bl_count;
+#else
+            MemoryMarshal.GetReference<ushort>(s.bl_count);
+#endif
+        ref int heap = ref
+#if NET7_0_OR_GREATER
+            refs.heap;
+#else
+            MemoryMarshal.GetReference<int>(s.heap);
+#endif
+        ref byte depth = ref
+#if NET7_0_OR_GREATER
+            refs.depth;
+#else
+            MemoryMarshal.GetReference<byte>(s.depth);
+#endif
 
-        ref byte window = ref MemoryMarshal.GetReference<byte>(s.window);
-        ref ushort prev = ref MemoryMarshal.GetReference<ushort>(s.prev);
-        ref ushort head = ref MemoryMarshal.GetReference<ushort>(s.head);
-        ref TreeNode dyn_ltree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_ltree);
-        ref TreeNode dyn_dtree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_dtree);
-        ref TreeNode bl_tree = ref MemoryMarshal.GetReference<TreeNode>(s.bl_tree);
-        ref ushort bl_count = ref MemoryMarshal.GetReference<ushort>(s.bl_count);
-        ref int heap = ref MemoryMarshal.GetReference<int>(s.heap);
-        ref byte depth = ref MemoryMarshal.GetReference<byte>(s.depth);
-        ref ushort bl_order = ref MemoryMarshal.GetReference<ushort>(s_bl_order);
-        ref byte dist_code = ref MemoryMarshal.GetReference<byte>(s_dist_code);
-        ref byte length_code = ref MemoryMarshal.GetReference<byte>(s_length_code);
-        ref int base_dist = ref MemoryMarshal.GetReference<int>(s_base_dist);
-        ref int base_length = ref MemoryMarshal.GetReference<int>(s_base_length);
-        ref int extra_dbits = ref MemoryMarshal.GetReference<int>(s_extra_dbits);
-        ref int extra_lbits = ref MemoryMarshal.GetReference<int>(s_extra_lbits);
+        ref TreeNode sta_ltree = ref
+#if NET7_0_OR_GREATER
+            refs.sta_ltree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(Tree.s_ltree);
+#endif
+        ref TreeNode sta_dtree = ref
+#if NET7_0_OR_GREATER
+            refs.sta_dtree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(Tree.s_dtree);
+#endif
+        ref TreeNode dyn_ltree = ref
+#if NET7_0_OR_GREATER
+            refs.dyn_ltree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(s.dyn_ltree);
+#endif
+        ref TreeNode dyn_dtree = ref
+#if NET7_0_OR_GREATER
+            refs.dyn_dtree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(s.dyn_dtree);
+#endif
+        ref TreeNode bl_tree = ref
+#if NET7_0_OR_GREATER
+            refs.bl_tree;
+#else
+            MemoryMarshal.GetReference<TreeNode>(s.bl_tree);
+#endif
+        ref ushort bl_order = ref
+#if NET7_0_OR_GREATER
+            refs.bl_order;
+#else
+            MemoryMarshal.GetReference<ushort>(s_bl_order);
+#endif
+        ref byte dist_code = ref
+#if NET7_0_OR_GREATER
+            refs.dist_code;
+#else
+            MemoryMarshal.GetReference<byte>(s_dist_code);
+#endif
+        ref byte length_code = ref
+#if NET7_0_OR_GREATER
+            refs.length_code;
+#else
+            MemoryMarshal.GetReference<byte>(s_length_code);
+#endif
+        ref int base_dist = ref
+#if NET7_0_OR_GREATER
+            refs.base_dist;
+#else
+            MemoryMarshal.GetReference<int>(s_base_dist);
+#endif
+        ref int base_length = ref
+#if NET7_0_OR_GREATER
+            refs.base_length;
+#else
+            MemoryMarshal.GetReference<int>(s_base_length);
+#endif
+        ref int extra_dbits = ref
+#if NET7_0_OR_GREATER
+            refs.extra_dbits;
+#else
+            MemoryMarshal.GetReference<int>(s_extra_dbits);
+#endif
+        ref int extra_lbits = ref
+#if NET7_0_OR_GREATER
+            refs.extra_lbits;
+#else
+            MemoryMarshal.GetReference<int>(s_extra_lbits);
+#endif
+        ref int extra_blbits = ref
+#if NET7_0_OR_GREATER
+            refs.extra_blbits;
+#else
+            MemoryMarshal.GetReference<int>(s_extra_blbits);
+#endif
+        bool bflush; // set if current block must be flushed
+        BlockState state;
         // Process the input block.
         for (; ; )
         {
@@ -1314,7 +1801,7 @@ internal static partial class Deflater
                  * of window index 0 (in particular we have to avoid a match
                  * of the string with itself at the start of the input file).
                  */
-                s.match_length = LongestMatch(s, hash_head, ref window);
+                s.match_length = LongestMatch(s, hash_head, ref window, ref prev);
                 // LongestMatch() sets match_start
 
                 if (s.match_length <= 5 && (s.strategy == Z_FILTERED
@@ -1354,10 +1841,10 @@ internal static partial class Deflater
                 s.match_length = MinMatch - 1;
                 s.strstart++;
 
-                if (bflush && FlushBlock(ref strm, 0, ref window, out state, ref pending_buf,
-                    ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap, ref depth,
-                    ref bl_order, ref dist_code, ref length_code, ref base_dist, ref base_length,
-                    ref extra_dbits, ref extra_lbits))
+                if (bflush && FlushBlock(ref strm, 0, ref window, out state, ref pending_buf, ref pending_out,
+                    ref sta_ltree, ref sta_dtree, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count,
+                    ref heap, ref depth, ref bl_order, ref dist_code, ref length_code, ref base_dist,
+                    ref base_length, ref extra_dbits, ref extra_lbits, ref extra_blbits))
                     return state;
 
             }
@@ -1372,10 +1859,10 @@ internal static partial class Deflater
                 TreeTallyLit(s, c, out bflush, ref pending_buf, ref dyn_ltree, ref dyn_dtree,
                     ref dist_code, ref length_code);
                 if (bflush)
-                    FlushBlockOnly(ref strm, 0, ref pending_buf, ref window,
-                        ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap, ref depth,
-                        ref bl_order, ref dist_code, ref length_code, ref base_dist, ref base_length,
-                        ref extra_dbits, ref extra_lbits);
+                    FlushBlockOnly(ref strm, 0, ref pending_buf, ref pending_out, ref window, ref sta_ltree,
+                        ref sta_dtree, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap,
+                        ref depth, ref bl_order, ref dist_code, ref length_code, ref base_dist, ref base_length,
+                        ref extra_dbits, ref extra_lbits, ref extra_blbits);
                 s.strstart++;
                 s.lookahead--;
                 if (strm.avail_out == 0)
@@ -1401,19 +1888,43 @@ internal static partial class Deflater
         s.insert = s.strstart < MinMatch - 1 ? s.strstart : MinMatch - 1;
         if (flush == Z_FINISH)
         {
-            if (FlushBlock(ref strm, 1, ref window, out state, ref pending_buf,
-                ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap, ref depth,
-                ref bl_order, ref dist_code, ref length_code, ref base_dist, ref base_length,
-                ref extra_dbits, ref extra_lbits))
+            if (FlushBlock(ref strm, 1, ref window, out state, ref pending_buf, ref pending_out,
+                ref sta_ltree, ref sta_dtree, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count,
+                ref heap, ref depth, ref bl_order, ref dist_code, ref length_code, ref base_dist,
+                ref base_length, ref extra_dbits, ref extra_lbits, ref extra_blbits))
                 return state;
             return BlockState.FinishDone;
         }
-        if (s.sym_next != 0 && FlushBlock(ref strm, 0, ref window, out state, ref pending_buf,
-            ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap, ref depth,
-            ref bl_order, ref dist_code, ref length_code, ref base_dist, ref base_length,
-            ref extra_dbits, ref extra_lbits))
+        if (s.sym_next != 0 && FlushBlock(ref strm, 0, ref window, out state, ref pending_buf, ref pending_out,
+            ref sta_ltree, ref sta_dtree, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count,
+            ref heap, ref depth, ref bl_order, ref dist_code, ref length_code, ref base_dist,
+            ref base_length, ref extra_dbits, ref extra_lbits, ref extra_blbits))
             return state;
 
         return BlockState.BlockDone;
     }
+
+#if NET7_0_OR_GREATER
+    private static void InitRefFields(DeflateState s, ref DeflateRefs refs)
+    {
+        if (netUnsafe.IsNullRef(ref refs.bl_order))
+        {
+            refs.window = ref MemoryMarshal.GetReference<byte>(s.window);
+            refs.prev = ref MemoryMarshal.GetReference<ushort>(s.prev);
+            refs.bl_count = ref MemoryMarshal.GetReference<ushort>(s.bl_count);
+            refs.heap = ref MemoryMarshal.GetReference<int>(s.heap);
+            refs.depth = ref MemoryMarshal.GetReference<byte>(s.depth);
+            refs.sta_ltree = ref MemoryMarshal.GetReference<TreeNode>(Tree.s_ltree);
+            refs.sta_dtree = ref MemoryMarshal.GetReference<TreeNode>(Tree.s_dtree);
+            refs.bl_order = ref MemoryMarshal.GetReference<ushort>(s_bl_order);
+            refs.dist_code = ref MemoryMarshal.GetReference<byte>(s_dist_code);
+            refs.length_code = ref MemoryMarshal.GetReference<byte>(s_length_code);
+            refs.base_dist = ref MemoryMarshal.GetReference<int>(s_base_dist);
+            refs.base_length = ref MemoryMarshal.GetReference<int>(s_base_length);
+            refs.extra_dbits = ref MemoryMarshal.GetReference<int>(s_extra_dbits);
+            refs.extra_lbits = ref MemoryMarshal.GetReference<int>(s_extra_lbits);
+            refs.extra_blbits = ref MemoryMarshal.GetReference<int>(s_extra_blbits);
+        }
+    }
+#endif
 }

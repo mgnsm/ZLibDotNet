@@ -3,6 +3,9 @@
 
 using System;
 using System.Buffers;
+#if NET7_0_OR_GREATER
+using System.Runtime.InteropServices;
+#endif
 
 namespace ZLibDotNet.Deflate;
 
@@ -49,6 +52,9 @@ internal static partial class Deflater
         {
             s = s_objectPool.Get();
             strm.deflateState = s;
+#if NET7_0_OR_GREATER
+            strm.deflateRefs = new();
+#endif
             s.status = InitState; // to pass state test in DeflateReset()
 
             s.wrap = wrap;
@@ -73,6 +79,11 @@ internal static partial class Deflater
 
             s.pending_buf_size = s.lit_bufsize * 4;
             s.pending_buf = ArrayPool<byte>.Shared.Rent((int)s.pending_buf_size);
+#if NET7_0_OR_GREATER
+            ref DeflateRefs refs = ref strm.deflateRefs;
+            refs.head = ref MemoryMarshal.GetReference<ushort>(s.head);
+            refs.pending_buf = ref MemoryMarshal.GetReference<byte>(s.pending_buf);
+#endif
         }
         catch (OutOfMemoryException)
         {

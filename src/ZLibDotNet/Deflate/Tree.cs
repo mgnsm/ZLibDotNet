@@ -20,12 +20,12 @@ internal static class Tree
 
     internal static readonly TreeNode[] s_dtree = new TreeNode[DCodes]
     {
-            new TreeNode(0, 5), new TreeNode(16, 5), new TreeNode(8, 5), new TreeNode(24, 5), new TreeNode(4, 5),
-            new TreeNode(20, 5), new TreeNode(12, 5), new TreeNode(28, 5), new TreeNode(2, 5), new TreeNode(18, 5),
-            new TreeNode(10, 5), new TreeNode(26, 5), new TreeNode(6, 5), new TreeNode(22, 5), new TreeNode(14, 5),
-            new TreeNode(30, 5), new TreeNode(1, 5), new TreeNode(17, 5), new TreeNode(9, 5), new TreeNode(25, 5),
-            new TreeNode(5, 5), new TreeNode(21, 5), new TreeNode(13, 5), new TreeNode(29, 5), new TreeNode(3, 5),
-            new TreeNode(19, 5), new TreeNode(11, 5), new TreeNode(27, 5), new TreeNode(7, 5), new TreeNode(23, 5)
+        new TreeNode(0, 5), new TreeNode(16, 5), new TreeNode(8, 5), new TreeNode(24, 5), new TreeNode(4, 5),
+        new TreeNode(20, 5), new TreeNode(12, 5), new TreeNode(28, 5), new TreeNode(2, 5), new TreeNode(18, 5),
+        new TreeNode(10, 5), new TreeNode(26, 5), new TreeNode(6, 5), new TreeNode(22, 5), new TreeNode(14, 5),
+        new TreeNode(30, 5), new TreeNode(1, 5), new TreeNode(17, 5), new TreeNode(9, 5), new TreeNode(25, 5),
+        new TreeNode(5, 5), new TreeNode(21, 5), new TreeNode(13, 5), new TreeNode(29, 5), new TreeNode(3, 5),
+        new TreeNode(19, 5), new TreeNode(11, 5), new TreeNode(27, 5), new TreeNode(7, 5), new TreeNode(23, 5)
     };
 
     internal static readonly TreeNode[] s_ltree = new TreeNode[LCodes + 2]
@@ -93,18 +93,26 @@ internal static class Tree
     /// <summary>
     /// Initializes the tree data structures for a new zlib stream.
     /// </summary>
-    internal static void Init(DeflateState s)
+    internal static void Init(ref ZStream strm)
     {
+        DeflateState s = strm.deflateState;
         s.bi_buf = 0;
         s.bi_valid = 0;
 #if DEBUG
         s.compressed_len = 0;
         s.bits_sent = 0;
 #endif
+        ref TreeNode dyn_ltree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_ltree);
+        ref TreeNode dyn_dtree = ref MemoryMarshal.GetReference<TreeNode>(s.dyn_dtree);
+        ref TreeNode bl_tree = ref MemoryMarshal.GetReference<TreeNode>(s.bl_tree);
+#if NET7_0_OR_GREATER
+        ref DeflateRefs refs = ref strm.deflateRefs;
+        refs.dyn_ltree = ref dyn_ltree;
+        refs.dyn_dtree = ref dyn_dtree;
+        refs.bl_tree = ref bl_tree;
+#endif
         // Initialize the first block of the first file:
-        InitBlock(s, ref MemoryMarshal.GetReference<TreeNode>(s.dyn_ltree),
-            ref MemoryMarshal.GetReference<TreeNode>(s.dyn_dtree),
-            ref MemoryMarshal.GetReference<TreeNode>(s.bl_tree));
+        InitBlock(s, ref dyn_ltree, ref dyn_dtree, ref bl_tree);
     }
 
     /// <summary>
@@ -129,10 +137,10 @@ internal static class Tree
     /// <summary>
     /// Sends one empty static block to give enough lookahead for inflate. This takes 10 bits, of which 7 may remain in the bit buffer.
     /// </summary>
-    internal static void Align(DeflateState s, ref byte pending_buf)
+    internal static void Align(DeflateState s, ref byte pending_buf, ref TreeNode sta_ltree)
     {
         SendBits(s, StaticTrees << 1, 3, ref pending_buf);
-        SendCode(s, ref Unsafe.Add(ref MemoryMarshal.GetReference<TreeNode>(s_ltree), EndBlock), ref pending_buf);
+        SendCode(s, ref Unsafe.Add(ref sta_ltree, EndBlock), ref pending_buf);
 #if DEBUG
         s.compressed_len += 10U; // 3 for block type, 7 for EOB
 #endif
@@ -143,13 +151,14 @@ internal static class Tree
     /// Determines the best encoding for the current block: dynamic trees, static trees or store, and writes out the encoded block.
     /// </summary>
     internal static void FlushBlock(ref ZStream strm, ref byte buf, uint stored_len, uint last,
-        ref byte pending_buf, ref TreeNode dyn_ltree, ref TreeNode dyn_dtree, ref TreeNode bl_tree,
-        ref ushort bl_count, ref int heap, ref byte depth, ref ushort bl_order, ref byte dist_code,
-        ref byte length_code, ref int base_dist, ref int base_length, ref int extra_dbits, ref int extra_lbits)
+        ref byte pending_buf, ref TreeNode sta_ltree, ref TreeNode sta_dtree, ref TreeNode dyn_ltree,
+        ref TreeNode dyn_dtree, ref TreeNode bl_tree, ref ushort bl_count, ref int heap, ref byte depth,
+        ref ushort bl_order, ref byte dist_code, ref byte length_code, ref int base_dist, ref int base_length,
+        ref int extra_dbits, ref int extra_lbits, ref int extra_blbits)
     {
         DeflateState s = strm.deflateState;
         uint opt_lenb, static_lenb; // opt_len and static_len in bytes
-        uint max_blindex = 0;  // index of last bit length code of non zero freq */
+        uint max_blindex = 0;  // index of last bit length code of non zero freq
 
         // Build the Huffman trees unless a stored block is forced
         if (s.level > 0)
@@ -159,10 +168,10 @@ internal static class Tree
                 strm.data_type = DetectDataType(ref dyn_ltree);
 
             // Construct the literal and distance trees
-            BuildTree(s, s.l_desc, ref bl_count, ref heap, ref depth);
+            BuildTree(s, s.l_desc, ref dyn_ltree, ref sta_ltree, ref extra_lbits, ref bl_count, ref heap, ref depth);
             Trace.Tracev($"\nlit data: dyn {s.opt_len}, stat {s.static_len}");
 
-            BuildTree(s, s.d_desc, ref bl_count, ref heap, ref depth);
+            BuildTree(s, s.d_desc, ref dyn_dtree, ref sta_dtree, ref extra_dbits, ref bl_count, ref heap, ref depth);
             Trace.Tracev($"\ndist data: dyn {s.opt_len}, stat {s.static_len}");
             /* At this point, opt_len and static_len are the total bit lengths of
              * the compressed block data, excluding the tree representations.
@@ -171,7 +180,7 @@ internal static class Tree
             /* Build the bit length tree for the above two trees, and get the index
              * in bl_order of the last bit length code to send.
              */
-            max_blindex = BuildBlTree(s, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref bl_count, ref heap, ref depth,
+            max_blindex = BuildBlTree(s, ref dyn_ltree, ref dyn_dtree, ref bl_tree, ref extra_blbits, ref bl_count, ref heap, ref depth,
                 ref bl_order);
 
             // Determine the best encoding. Compute the block lengths in bytes.
@@ -204,8 +213,7 @@ internal static class Tree
         else if (static_lenb == opt_lenb)
         {
             SendBits(s, (StaticTrees << 1) + last, 3, ref pending_buf);
-            CompressBlock(s, ref MemoryMarshal.GetReference<TreeNode>(s_ltree),
-                ref MemoryMarshal.GetReference<TreeNode>(s_dtree), ref pending_buf, ref dist_code, ref length_code,
+            CompressBlock(s, ref sta_ltree, ref sta_dtree, ref pending_buf, ref dist_code, ref length_code,
                 ref base_dist, ref base_length, ref extra_dbits, ref extra_lbits);
 #if DEBUG
             s.compressed_len += 3 + s.static_len;
@@ -377,14 +385,12 @@ internal static class Tree
         return Z_BINARY;
     }
 
-    private static void BuildTree(DeflateState s, TreeDescriptor desc, ref ushort bl_count, ref int heap, ref byte depth)
+    private static void BuildTree(DeflateState s, TreeDescriptor desc, ref TreeNode tree, ref TreeNode stree, ref int extra,
+        ref ushort bl_count, ref int heap, ref byte depth)
     {
         uint elems = desc.stat_desc.elems;
         int max_code = -1; // largest code with non zero frequency
         uint node;         // new node being created
-        ref TreeNode tree = ref MemoryMarshal.GetReference<TreeNode>(desc.dyn_tree);
-        ref TreeNode stree = ref desc.stat_desc.static_tree == null ? ref netUnsafe.NullRef<TreeNode>()
-            : ref MemoryMarshal.GetReference<TreeNode>(desc.stat_desc.static_tree);
 
         /* Construct the initial heap, with least frequent element in
          * heap[SMALLEST]. The sons of heap[n] are heap[2*n] and heap[2*n+1].
@@ -464,7 +470,7 @@ internal static class Tree
         /* At this point, the fields freq and dad are set. We can now
          * generate the bit lengths.
          */
-        GenBitLen(s, desc, ref bl_count, ref heap);
+        GenBitLen(s, desc, ref tree, ref stree, ref extra, ref bl_count, ref heap);
 
         // The field len is now set, we can generate the bit codes
         GenCodes(ref tree, max_code, ref bl_count);
@@ -519,7 +525,8 @@ internal static class Tree
     /// <summary>
     /// Computes the optimal bit lengths for a tree and update the total bit length for the current block.
     /// </summary>
-    private static void GenBitLen(DeflateState s, TreeDescriptor desc, ref ushort bl_count, ref int heap)
+    private static void GenBitLen(DeflateState s, TreeDescriptor desc, ref TreeNode tree, ref TreeNode stree,
+        ref int extra, ref ushort bl_count, ref int heap)
     {
         int max_code = desc.max_code;
         uint @base = desc.stat_desc.extra_base;
@@ -528,10 +535,6 @@ internal static class Tree
         uint n;             // iterate over the tree elements
         uint bits;          // bit length
         int overflow = 0;   // number of elements with bit length too large
-        ref TreeNode tree = ref MemoryMarshal.GetReference<TreeNode>(desc.dyn_tree);
-        ref TreeNode stree = ref desc.stat_desc.static_tree == null ? ref netUnsafe.NullRef<TreeNode>()
-            : ref MemoryMarshal.GetReference<TreeNode>(desc.stat_desc.static_tree);
-        ref int extra = ref MemoryMarshal.GetReference<int>(desc.stat_desc.extra_bits);
 
         netUnsafe.InitBlock(ref netUnsafe.As<ushort, byte>(ref bl_count), 0, MaxBits * sizeof(ushort));
 
@@ -665,7 +668,7 @@ internal static class Tree
     /// Construct the Huffman tree for the bit lengths and return the index in bl_order of the last bit length code to send.
     /// </summary>
     private static uint BuildBlTree(DeflateState s, ref TreeNode dyn_ltree, ref TreeNode dyn_dtree, ref TreeNode bl_tree,
-        ref ushort bl_count, ref int heap, ref byte depth, ref ushort bl_order)
+        ref int extra, ref ushort bl_count, ref int heap, ref byte depth, ref ushort bl_order)
     {
         uint max_blindex; // index of last bit length code of non zero freq
 
@@ -674,7 +677,7 @@ internal static class Tree
         ScanTree(ref dyn_dtree, s.d_desc.max_code, ref bl_tree);
 
         // Build the bit length tree:
-        BuildTree(s, s.bl_desc, ref bl_count, ref heap, ref depth);
+        BuildTree(s, s.bl_desc, ref bl_tree, ref netUnsafe.NullRef<TreeNode>(), ref extra, ref bl_count, ref heap, ref depth);
         /* opt_len now includes the length of the tree representations, except
          * the lengths of the bit lengths codes and the 5+5+4 bits for the counts.
          */

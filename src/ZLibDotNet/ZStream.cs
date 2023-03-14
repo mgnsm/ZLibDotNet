@@ -1,6 +1,9 @@
 ﻿// Copyright (C) 2022-2023 Magnus Montin
 
 using System;
+#if NET7_0_OR_GREATER
+using System.Runtime.InteropServices;
+#endif
 using ZLibDotNet.Deflate;
 using ZLibDotNet.Inflate;
 
@@ -31,6 +34,13 @@ public ref struct ZStream
     internal ReadOnlySpan<byte> _input;
     internal Span<byte> _output;
 
+#if NET7_0_OR_GREATER
+    internal ref byte input_ptr;
+    internal ref byte output_ptr;
+    internal InflateRefs inflateRefs;
+    internal DeflateRefs deflateRefs;
+#endif
+
     /// <summary>
     /// Gets or sets the input buffer.
     /// </summary>
@@ -43,6 +53,9 @@ public ref struct ZStream
             _input = value;
             next_in = default;
             avail_in = (uint)value.Length;
+#if NET7_0_OR_GREATER
+            input_ptr = ref MemoryMarshal.GetReference(_input);
+#endif
         }
     }
 
@@ -98,6 +111,9 @@ public ref struct ZStream
             _output = value;
             next_out = default;
             avail_out = (uint)value.Length;
+#if NET7_0_OR_GREATER
+            output_ptr = ref MemoryMarshal.GetReference(_output);
+#endif
         }
     }
 

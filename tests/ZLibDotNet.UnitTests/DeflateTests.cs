@@ -302,7 +302,13 @@ public class DeflateTests
         Assert.AreEqual(Z_OK, zlib.DeflateEnd(ref zStream));
 
         Assert.AreEqual(Z_STREAM_ERROR, zlib.DeflateSetDictionary(ref zStream, default));
+        Assert.AreEqual(Z_STREAM_ERROR, zlib.DeflateSetDictionary(ref zStream, Array.Empty<byte>()));
         Assert.AreEqual(Z_STREAM_ERROR, zlib.DeflateSetDictionary(ref zStream, ReadOnlySpan<byte>.Empty));
+
+        Assert.AreEqual(Z_OK, zlib.DeflateInit(ref zStream, Z_BEST_COMPRESSION));
+        Assert.AreEqual(Z_STREAM_ERROR, zlib.DeflateSetDictionary(ref zStream, default));
+        Assert.AreEqual(Z_OK, zlib.DeflateSetDictionary(ref zStream, Array.Empty<byte>()));
+        Assert.AreEqual(Z_OK, zlib.DeflateSetDictionary(ref zStream, ReadOnlySpan<byte>.Empty));
     }
 
     [TestMethod]

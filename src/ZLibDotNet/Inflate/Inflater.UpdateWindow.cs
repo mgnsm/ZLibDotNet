@@ -8,12 +8,20 @@ namespace ZLibDotNet.Inflate;
 
 internal static partial class Inflater
 {
-    private static void UpdateWindow(ref ZStream strm, ref byte end, uint copy)
+    private static void UpdateWindow(ref ZStream strm, ref byte end, uint copy, ref byte window)
     {
         InflateState state = strm.inflateState;
 
         // if it hasn't been done already, allocate space for the window
-        state.window ??= ArrayPool<byte>.Shared.Rent(1 << (int)state.wbits);
+        if (state.window == null)
+        {
+            state.window = ArrayPool<byte>.Shared.Rent(1 << (int)state.wbits);
+            window = ref MemoryMarshal.GetReference<byte>(state.window);
+        }
+        else if (netUnsafe.IsNullRef(ref window))
+        {
+            window = ref MemoryMarshal.GetReference<byte>(state.window);
+        }
 
         // if window not in use yet, initialize
         if (state.wsize == 0)
@@ -23,7 +31,6 @@ internal static partial class Inflater
             state.whave = 0;
         }
 
-        ref byte window = ref MemoryMarshal.GetReference<byte>(state.window);
         // copy state.wsize or less output bytes into the circular window
         if (copy >= state.wsize)
         {

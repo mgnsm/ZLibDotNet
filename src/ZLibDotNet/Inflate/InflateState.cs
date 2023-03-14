@@ -6,7 +6,7 @@ namespace ZLibDotNet.Inflate;
 /// <summary>
 /// State maintained between <see cref="ZLib.Inflate(ref ZStream, int)"/> calls.
 /// </summary>
-internal class InflateState
+internal sealed class InflateState
 {
     private const ushort Enough = Inflater.EnoughLens + Inflater.EnoughDists;
 

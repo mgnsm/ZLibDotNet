@@ -18,7 +18,12 @@ internal static partial class Deflater
         if (level < 0 || level > 9 || strategy < 0 || strategy > Z_FIXED)
             return Z_STREAM_ERROR;
 
-        ref Config configuration_table = ref MemoryMarshal.GetReference<Config>(s_configuration_table);
+        ref Config configuration_table = ref
+#if NET7_0_OR_GREATER
+            strm.deflateRefs.configuration_table;
+#else
+            MemoryMarshal.GetReference<Config>(s_configuration_table);
+#endif
         Config.DeflateType deflate_type = Unsafe.Add(ref configuration_table, (uint)s.level).deflate_type;
         ref Config config = ref Unsafe.Add(ref configuration_table, (uint)level);
         if ((strategy != s.strategy || deflate_type != config.deflate_type)
@@ -36,9 +41,31 @@ internal static partial class Deflater
             if (s.level == 0 && s.matches != 0)
             {
                 if (s.matches == 1)
-                    SlideHash(s, ref MemoryMarshal.GetReference<ushort>(s.head));
+                {
+#if NET7_0_OR_GREATER
+                    ref DeflateRefs refs = ref strm.deflateRefs;
+                    if (netUnsafe.IsNullRef(ref refs.prev))
+                        refs.prev = ref MemoryMarshal.GetReference<ushort>(s.prev);
+#endif
+                    ref ushort prev = ref
+#if NET7_0_OR_GREATER
+                    refs.prev;
+#else
+                    MemoryMarshal.GetReference<ushort>(s.prev);
+#endif
+
+                    SlideHash(s, ref prev, ref
+#if NET7_0_OR_GREATER
+                    refs.head
+#else
+                    MemoryMarshal.GetReference<ushort>(s.head)
+#endif
+                    );
+                }
                 else
-                    ClearHash(s.head);
+                {
+                    ClearHash(ref strm);
+                }
                 s.matches = 0;
             }
             s.level = level;

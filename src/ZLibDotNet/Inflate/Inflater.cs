@@ -110,15 +110,35 @@ internal static partial class Inflater
         if (state.mode == InflateMode.Type) // Skip check
             state.mode = InflateMode.Typedo;
 
-        ref byte next = ref MemoryMarshal.GetReference(strm._input.Slice((int)strm.next_in)); // next input
-        ref byte put = ref MemoryMarshal.GetReference(strm._output.Slice((int)strm.next_out)); // next output
+        ref byte next = ref // next input
+#if NET7_0_OR_GREATER
+            Unsafe.Add(ref strm.input_ptr, strm.next_in);
+#else
+            MemoryMarshal.GetReference(strm._input.Slice((int)strm.next_in));
+#endif
+        ref byte put = ref // next output
+#if NET7_0_OR_GREATER
+            Unsafe.Add(ref strm.output_ptr, strm.next_out);
+#else
+            MemoryMarshal.GetReference(strm._output.Slice((int)strm.next_out));
+#endif
         ref byte from = ref netUnsafe.NullRef<byte>(); // where to copy match bytes from
-        ref Code codes = ref MemoryMarshal.GetReference<Code>(state.codes);
-        ref ushort lens = ref MemoryMarshal.GetReference<ushort>(state.lens);
-        ref ushort work = ref MemoryMarshal.GetReference<ushort>(state.work);
-        ref byte window = ref MemoryMarshal.GetReference<byte>(state.window);
+#if NET7_0_OR_GREATER
+        ref InflateRefs refs = ref strm.inflateRefs;
+        ref Code codes = ref refs.codes;
+#else
+        ref Code codes = ref netUnsafe.NullRef<Code>();
+        ref ushort lens = ref netUnsafe.NullRef<ushort>();
+        ref ushort work = ref netUnsafe.NullRef<ushort>();
+        ref byte window = ref netUnsafe.NullRef<byte>();
         ref Code lencode = ref netUnsafe.NullRef<Code>();
-        ref ushort order = ref MemoryMarshal.GetReference<ushort>(s_order);
+        ref Code distcode = ref netUnsafe.NullRef<Code>();
+        ref ushort order = ref netUnsafe.NullRef<ushort>();
+        ref ushort lbase = ref netUnsafe.NullRef<ushort>();
+        ref ushort lext = ref netUnsafe.NullRef<ushort>();
+        ref ushort dbase = ref netUnsafe.NullRef<ushort>();
+        ref ushort dext = ref netUnsafe.NullRef<ushort>();
+#endif
         uint have = strm.avail_in;          // available input
         uint left = strm.avail_out;         // ...and output
         uint hold = strm.inflateState.hold; // bit buffer
@@ -355,6 +375,24 @@ internal static partial class Inflater
                     state.mode = InflateMode.LenLens;
                     goto case InflateMode.LenLens;
                 case InflateMode.LenLens:
+                    if (netUnsafe.IsNullRef(ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    lens))
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        lens = ref MemoryMarshal.GetReference<ushort>(state.lens);
+                    if (netUnsafe.IsNullRef(ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    order))
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        order = ref MemoryMarshal.GetReference<ushort>(s_order);
                     while (state.have < state.ncode)
                     {
                         while (bits < 3)
@@ -367,16 +405,83 @@ internal static partial class Inflater
                             next_in++;
                             bits += 8;
                         }
-                        Unsafe.Add(ref lens, (uint)Unsafe.Add(ref order, state.have++)) = (ushort)(hold & ((1U << (3)) - 1));
+                        Unsafe.Add(ref
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        lens, (uint)Unsafe.Add(ref
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        order, state.have++)) = (ushort)(hold & ((1U << (3)) - 1));
                         hold >>= 3;
                         bits -= 3;
                     }
                     while (state.have < 19)
-                        Unsafe.Add(ref lens, (uint)Unsafe.Add(ref order, state.have++)) = 0;
+                        Unsafe.Add(ref
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        lens, (uint)Unsafe.Add(ref
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        order, state.have++)) = 0;
                     state.next = 0;
                     state.lencode = state.codes;
                     state.lenbits = 7;
-                    ret = InflateTable(CodeType.Codes, ref lens, 19, ref codes, ref state.lenbits, ref work, ref state.next);
+                    if (netUnsafe.IsNullRef(ref codes))
+                    {
+                        codes = ref MemoryMarshal.GetReference<Code>(state.codes);
+#if NET7_0_OR_GREATER
+                        refs.codes = ref codes;
+#endif
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        work = ref MemoryMarshal.GetReference<ushort>(state.work);
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        lbase = ref MemoryMarshal.GetReference<ushort>(s_lbase);
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        lext = ref MemoryMarshal.GetReference<ushort>(s_lext);
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        dbase = ref MemoryMarshal.GetReference<ushort>(s_dbase);
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        dext = ref MemoryMarshal.GetReference<ushort>(s_dext);
+                    }
+                    ret = InflateTable(CodeType.Codes, ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    lens, 19, ref codes, ref state.lenbits, ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    work, ref state.next, ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    lbase, ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    lext, ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    dbase, ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    dext);
                     if (ret != 0)
                     {
                         strm.msg = "invalid code lengths set";
@@ -388,12 +493,24 @@ internal static partial class Inflater
                     state.mode = InflateMode.CodeLens;
                     goto case InflateMode.CodeLens;
                 case InflateMode.CodeLens:
-                    lencode = ref MemoryMarshal.GetReference<Code>(state.lencode);
+                    if (netUnsafe.IsNullRef(ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    lencode))
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        lencode = ref MemoryMarshal.GetReference<Code>(state.lencode);
                     while (state.have < state.nlen + state.ndist)
                     {
                         for (; ; )
                         {
-                            here = Unsafe.Add(ref lencode, hold & ((1U << (state.lenbits)) - 1));
+                            here = Unsafe.Add(ref
+#if NET7_0_OR_GREATER
+                            refs.
+#endif
+                            lencode, hold & ((1U << (state.lenbits)) - 1));
                             if (here.bits <= bits)
                                 break;
                             if (have == 0)
@@ -408,7 +525,11 @@ internal static partial class Inflater
                         {
                             hold >>= here.bits;
                             bits -= here.bits;
-                            Unsafe.Add(ref lens, state.have++) = here.val;
+                            Unsafe.Add(ref
+#if NET7_0_OR_GREATER
+                            refs.
+#endif
+                            lens, state.have++) = here.val;
                         }
                         else
                         {
@@ -432,7 +553,11 @@ internal static partial class Inflater
                                     state.mode = InflateMode.Bad;
                                     break;
                                 }
-                                len = Unsafe.Add(ref lens, state.have - 1);
+                                len = Unsafe.Add(ref
+#if NET7_0_OR_GREATER
+                                refs.
+#endif
+                                lens, state.have - 1);
                                 copy = 3 + (hold & ((1U << (2)) - 1));
                                 hold >>= 2;
                                 bits -= 2;
@@ -482,7 +607,11 @@ internal static partial class Inflater
                                 break;
                             }
                             while (copy-- != 0)
-                                Unsafe.Add(ref lens, state.have++) = (ushort)len;
+                                Unsafe.Add(ref
+#if NET7_0_OR_GREATER
+                                refs.
+#endif
+                                lens, state.have++) = (ushort)len;
                         }
                     }
 
@@ -491,7 +620,11 @@ internal static partial class Inflater
                         break;
 
                     // check for end-of-block code (better have one)
-                    if (Unsafe.Add(ref lens, 256U) == 0)
+                    if (Unsafe.Add(ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    lens, 256U) == 0)
                     {
                         strm.msg = "invalid code -- missing end-of-block";
                         state.mode = InflateMode.Bad;
@@ -502,7 +635,31 @@ internal static partial class Inflater
                     state.next = 0;
                     state.lencode = state.codes;
                     state.lenbits = 9;
-                    ret = InflateTable(CodeType.Lens, ref lens, state.nlen, ref codes, ref state.lenbits, ref work, ref state.next);
+                    ret = InflateTable(CodeType.Lens, ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    lens, state.nlen, ref codes, ref state.lenbits, ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    work, ref state.next, ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    lbase, ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    lext, ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    dbase, ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    dext);
                     if (ret != 0)
                     {
                         strm.msg = "invalid literal/lengths set";
@@ -513,7 +670,31 @@ internal static partial class Inflater
                     state.diststart = state.next;
                     state.distbits = 6;
                     codes = ref Unsafe.Add(ref codes, state.next);
-                    ret = InflateTable(CodeType.Dists, ref Unsafe.Add(ref lens, state.nlen), state.ndist, ref codes, ref state.distbits, ref work, ref state.next);
+                    ret = InflateTable(CodeType.Dists, ref Unsafe.Add(ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    lens, state.nlen), state.ndist, ref codes, ref state.distbits, ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    work, ref state.next, ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    lbase, ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    lext, ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    dbase, ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    dext);
                     if (ret != 0)
                     {
                         strm.msg = "invalid distances set";
@@ -529,6 +710,24 @@ internal static partial class Inflater
                     state.mode = InflateMode.Len;
                     goto case InflateMode.Len;
                 case InflateMode.Len:
+                    if (netUnsafe.IsNullRef(ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    lencode))
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        lencode = ref MemoryMarshal.GetReference<Code>(state.lencode);
+                    if (netUnsafe.IsNullRef(ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    distcode))
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        distcode = ref MemoryMarshal.GetReference<Code>(state.distcode);
                     if (have >= 6 && left >= 258)
                     {
                         strm.next_out = next_out;
@@ -537,11 +736,42 @@ internal static partial class Inflater
                         strm.avail_in = have;
                         strm.inflateState.hold = hold;
                         strm.inflateState.bits = bits;
-                        InflateFast(ref strm, @out);
-                        put = ref MemoryMarshal.GetReference(strm._output.Slice((int)strm.next_out));
+                        if (netUnsafe.IsNullRef(ref
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        window))
+#if NET7_0_OR_GREATER
+                            refs.
+#endif
+                            window = ref MemoryMarshal.GetReference<byte>(state.window);
+                        InflateFast(ref strm, @out, ref
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        window, ref
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        lencode, ref Unsafe.Add(ref
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        distcode, state.diststart));
+                        put = ref
+#if NET7_0_OR_GREATER
+                        Unsafe.Add(ref strm.output_ptr, strm.next_out);
+#else
+                        MemoryMarshal.GetReference(strm._output.Slice((int)strm.next_out));
+#endif
                         next_out = strm.next_out;
                         left = strm.avail_out;
-                        next = ref MemoryMarshal.GetReference(strm._input.Slice((int)strm.next_in));
+                        next = ref
+#if NET7_0_OR_GREATER
+                        Unsafe.Add(ref strm.input_ptr, strm.next_in);
+#else
+                        MemoryMarshal.GetReference(strm._input.Slice((int)strm.next_in));
+#endif
                         next_in = strm.next_in;
                         have = strm.avail_in;
                         hold = strm.inflateState.hold;
@@ -553,10 +783,13 @@ internal static partial class Inflater
                         break;
                     }
                     state.back = 0;
-                    lencode = ref MemoryMarshal.GetReference<Code>(state.lencode);
                     for (; ; )
                     {
-                        here = Unsafe.Add(ref lencode, hold & ((1U << (state.lenbits)) - 1));
+                        here = Unsafe.Add(ref
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        lencode, hold & ((1U << (state.lenbits)) - 1));
                         if (here.bits <= bits)
                             break;
                         if (have == 0)
@@ -572,7 +805,11 @@ internal static partial class Inflater
                         last = here;
                         for (; ; )
                         {
-                            here = Unsafe.Add(ref lencode, last.val + ((hold & (1U << last.bits + last.op - 1)) >> last.bits));
+                            here = Unsafe.Add(ref
+#if NET7_0_OR_GREATER
+                            refs.
+#endif
+                            lencode, last.val + ((hold & (1U << last.bits + last.op - 1)) >> last.bits));
                             if ((uint)(last.bits + here.bits) <= bits)
                                 break;
                             if (have == 0)
@@ -638,10 +875,22 @@ internal static partial class Inflater
                     state.mode = InflateMode.Dist;
                     goto case InflateMode.Dist;
                 case InflateMode.Dist:
-                    ref Code distcode = ref MemoryMarshal.GetReference<Code>(state.distcode);
+                    if (netUnsafe.IsNullRef(ref
+#if NET7_0_OR_GREATER
+                    refs.
+#endif
+                    distcode))
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        distcode = ref MemoryMarshal.GetReference<Code>(state.distcode);
                     for (; ; )
                     {
-                        here = Unsafe.Add(ref distcode, state.diststart + (hold & ((1U << (state.distbits)) - 1)));
+                        here = Unsafe.Add(ref
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        distcode, state.diststart + (hold & ((1U << (state.distbits)) - 1)));
                         if (here.bits <= bits)
                             break;
                         if (have == 0)
@@ -657,7 +906,11 @@ internal static partial class Inflater
                         last = here;
                         for (; ; )
                         {
-                            here = Unsafe.Add(ref distcode, state.diststart + last.val +
+                            here = Unsafe.Add(ref
+#if NET7_0_OR_GREATER
+                            refs.
+#endif
+                            distcode, state.diststart + last.val +
                                 ((hold & ((1U << (last.bits + last.op)) - 1)) >> last.bits));
                             if ((uint)(last.bits + here.bits) <= bits)
                                 break;
@@ -720,13 +973,30 @@ internal static partial class Inflater
                             state.mode = InflateMode.Bad;
                             break;
                         }
+                        if (netUnsafe.IsNullRef(ref
+#if NET7_0_OR_GREATER
+                        refs.
+#endif
+                        window))
+#if NET7_0_OR_GREATER
+                            refs.
+#endif
+                            window = ref MemoryMarshal.GetReference<byte>(state.window);
                         if (copy > state.wnext)
                         {
                             copy -= state.wnext;
-                            from = ref Unsafe.Add(ref window, state.wsize - copy);
+                            from = ref Unsafe.Add(ref
+#if NET7_0_OR_GREATER
+                            refs.
+#endif
+                            window, state.wsize - copy);
                         }
                         else
-                            from = ref Unsafe.Add(ref window, state.wnext - copy);
+                            from = ref Unsafe.Add(ref
+#if NET7_0_OR_GREATER
+                            refs.
+#endif
+                            window, state.wnext - copy);
                         if (copy > state.length)
                             copy = state.length;
                     }
@@ -814,7 +1084,11 @@ internal static partial class Inflater
         {
             try
             {
-                UpdateWindow(ref strm, ref put, @out - strm.avail_out);
+                UpdateWindow(ref strm, ref put, @out - strm.avail_out, ref
+#if NET7_0_OR_GREATER
+                refs.
+#endif
+                window);
             }
             catch (OutOfMemoryException)
             {

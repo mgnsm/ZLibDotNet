@@ -28,7 +28,8 @@ internal static partial class Inflater
         // copy dictionary to window using updatewindow(), which will amend the existing dictionary if appropriate
         try
         {
-            UpdateWindow(ref strm, ref Unsafe.Add(ref dictionary, dictLength), dictLength);
+            UpdateWindow(ref strm, ref Unsafe.Add(ref dictionary, dictLength), dictLength,
+                ref netUnsafe.NullRef<byte>());
         }
         catch (OutOfMemoryException)
         {

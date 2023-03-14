@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard1.3;net6.0</TargetFrameworks>
-    <LangVersion>10.0</LangVersion>
+    <TargetFrameworks>netstandard1.3;net6.0;net7.0</TargetFrameworks>
+    <LangVersion>11.0</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
@@ -38,8 +38,12 @@ Fully open-sourced and continuously integrated on GitHub.</Description>
     <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="5.0.0" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
+  <ItemGroup Condition="'$(TargetFramework)' != 'netstandard1.3'">
     <Compile Remove="Unsafe.cs" />
   </ItemGroup>
     
+  <ItemGroup Condition="'$(TargetFramework)' != 'net7.0'">
+    <Compile Remove="Deflate/DeflateRefs.cs" />
+    <Compile Remove="Inflate/InflateRefs.cs" />
+  </ItemGroup>
 </Project>

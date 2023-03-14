@@ -21,9 +21,9 @@ internal static class Compressor
         if (err != Z_OK)
             return err;
 
-        stream._output = dest;
+        stream.Output = dest;
         stream.avail_out = 0;
-        stream._input = source;
+        stream.Input = source;
         stream.avail_in = 0;
 
         do
@@ -65,16 +65,16 @@ internal static class Compressor
 
         ZStream stream = new()
         {
-            _input = source,
-            //avail_in = 0
+            Input = source,
+            avail_in = 0
         };
 
         int err = Inflater.InflateInit(ref stream, DefaultWindowBits);
         if (err != Z_OK)
             return err;
 
-        stream._output = dest;
-        //stream.avail_out = 0;
+        stream.Output = dest;
+        stream.avail_out = 0;
 
         do
         {

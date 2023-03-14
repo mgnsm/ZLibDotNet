@@ -12,25 +12,26 @@ internal static partial class Inflater
     internal const ushort EnoughDists = 592;
     private const byte MaxBits = 15;
 
-    private static readonly ushort[] s_lbase = new ushort[31] { // Length codes 257..285 base
+    internal static readonly ushort[] s_lbase = new ushort[31] { // Length codes 257..285 base
         3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31,
         35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258, 0, 0 };
 
-    private static readonly ushort[] s_lext = new ushort[31] { // Length codes 257..285 extra
+    internal static readonly ushort[] s_lext = new ushort[31] { // Length codes 257..285 extra
         16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 18, 18, 18, 18,
         19, 19, 19, 19, 20, 20, 20, 20, 21, 21, 21, 21, 16, 194, 165 };
 
-    private static readonly ushort[] s_dbase = new ushort[32] { // Distance codes 0..29 base
+    internal static readonly ushort[] s_dbase = new ushort[32] { // Distance codes 0..29 base
         1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193,
         257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145,
         8193, 12289, 16385, 24577, 0, 0 };
 
-    private static readonly ushort[] s_dext = new ushort[32]{ // Distance codes 0..29 extra
+    internal static readonly ushort[] s_dext = new ushort[32]{ // Distance codes 0..29 extra
         16, 16, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 22, 22,
         23, 23, 24, 24, 25, 25, 26, 26, 27, 27,
         28, 28, 29, 29, 64, 64 };
 
-    internal static int InflateTable(CodeType type, ref ushort lens, uint codes, ref Code table, ref int bits, ref ushort work, ref uint offset)
+    internal static int InflateTable(CodeType type, ref ushort lens, uint codes, ref Code table, ref int bits, ref ushort work, ref uint offset,
+        ref ushort lbase, ref ushort lext, ref ushort dbase, ref ushort dext)
     {
         Code here;                          // table entry for duplication
         const byte Length = MaxBits + 1;
@@ -95,28 +96,21 @@ internal static partial class Inflater
             if (Unsafe.Add(ref lens, sym) != 0)
                 Unsafe.Add(ref work, (uint)Unsafe.Add(ref ptrToOffs, (uint)Unsafe.Add(ref lens, sym))++) = (ushort)sym;
 
-        ref ushort lbase = ref MemoryMarshal.GetReference<ushort>(s_lbase);
-        ref ushort lext = ref MemoryMarshal.GetReference<ushort>(s_lext);
-        ref ushort dbase = ref MemoryMarshal.GetReference<ushort>(s_dbase);
-        ref ushort dext = ref MemoryMarshal.GetReference<ushort>(s_dext);
-        ref ushort @base = ref netUnsafe.NullRef<ushort>(); // base value table to use
-        ref ushort extra = ref netUnsafe.NullRef<ushort>(); // extra bits table to use
-        uint match; // use base and extra for symbol >= match
+        ref ushort @base = ref dbase; // base value table to use
+        ref ushort extra = ref dext; // extra bits table to use
+        uint match = 0; // use base and extra for symbol >= match
         // set up for code type
         switch (type)
         {
             case CodeType.Codes:
+                @base = ref netUnsafe.NullRef<ushort>();
+                extra = ref netUnsafe.NullRef<ushort>();
                 match = 20;
                 break;
             case CodeType.Lens:
                 @base = ref lbase;
                 extra = ref lext;
                 match = 257;
-                break;
-            default: // DISTS
-                @base = ref dbase;
-                extra = ref dext;
-                match = 0;
                 break;
         }
 
