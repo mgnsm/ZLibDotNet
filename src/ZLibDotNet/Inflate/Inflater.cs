@@ -8,7 +8,7 @@ namespace ZLibDotNet.Inflate;
 
 internal static partial class Inflater
 {
-    private static readonly Code[] s_lenfix = new Code[512]
+    internal static readonly Code[] s_lenfix = new Code[512]
     {
         new Code(96,7,0), new Code(0,8,80), new Code(0,8,16), new Code(20,8,115), new Code(18,7,31), new Code(0,8,112), new Code(0,8,48),
         new Code(0,9,192), new Code(16,7,10), new Code(0,8,96), new Code(0,8,32), new Code(0,9,160), new Code(0,8,0), new Code(0,8,128),
@@ -86,7 +86,7 @@ internal static partial class Inflater
         new Code(0,9,255)
     };
 
-    private static readonly Code[] s_distfix = new Code[32]
+    internal static readonly Code[] s_distfix = new Code[32]
     {
         new Code(16,5,1), new Code(23,5,257), new Code(19,5,17), new Code(27,5,4097), new Code(17,5,5), new Code(25,5,1025),
         new Code(21,5,65), new Code(29,5,16385), new Code(16,5,3), new Code(24,5,513), new Code(20,5,33), new Code(28,5,8193),

@@ -519,6 +519,75 @@ public class InflateTests
                 Assert.AreEqual(Z_BUF_ERROR, zlib.Inflate(ref strm, Z_NO_FLUSH));
             }
             Assert.AreEqual(Z_OK, zlib.InflateCopy(ref strm, ref copy));
+
+            Assert.AreEqual(strm.next_in, copy.next_in);
+            Assert.AreEqual(strm.avail_in, copy.avail_in);
+            Assert.AreEqual(strm.total_in, copy.total_in);
+            Assert.AreEqual(strm.next_out, copy.next_out);
+            Assert.AreEqual(strm.avail_out, copy.avail_out);
+            Assert.AreEqual(strm.total_out, copy.total_out);
+            Assert.AreEqual(strm.msg, copy.msg);
+            Assert.AreEqual(strm.data_type, copy.data_type);
+            Assert.AreEqual(strm.Adler, copy.Adler);
+            Assert.IsTrue(strm._input == copy._input);
+            Assert.IsTrue(strm._output == copy._output);
+            Assert.IsNotNull(copy.inflateState);
+            Assert.IsNull(copy.deflateState);
+
+            InflateState a = strm.inflateState;
+            InflateState b = copy.inflateState;
+            Assert.AreNotEqual(a, b);
+            Assert.AreEqual(a.mode, b.mode);
+            Assert.AreEqual(a.last, b.last);
+            Assert.AreEqual(a.wrap, b.wrap);
+            Assert.AreEqual(a.havedict, b.havedict);
+            Assert.AreEqual(a.flags, b.flags);
+            Assert.AreEqual(a.dmax, b.dmax);
+            Assert.AreEqual(a.check, b.check);
+            Assert.AreEqual(a.total, b.total);
+            Assert.AreEqual(a.wbits, b.wbits);
+            Assert.AreEqual(a.wsize, b.wsize);
+            Assert.AreEqual(a.whave, b.whave);
+            Assert.AreEqual(a.wnext, b.wnext);
+            Assert.AreEqual(a.hold, b.hold);
+            Assert.AreEqual(a.bits, b.bits);
+            Assert.AreEqual(a.length, b.length);
+            Assert.AreEqual(a.offset, b.offset);
+            Assert.AreEqual(a.extra, b.extra);
+            Assert.AreEqual(a.lenbits, b.lenbits);
+            Assert.AreEqual(a.distbits, b.distbits);
+            Assert.AreEqual(a.ncode, b.ncode);
+            Assert.AreEqual(a.nlen, b.nlen);
+            Assert.AreEqual(a.ndist, b.ndist);
+            Assert.AreEqual(a.have, b.have);
+            Assert.AreEqual(a.next, b.next);
+            Assert.AreEqual(a.diststart, b.diststart);
+            Assert.AreNotEqual(a.lens, b.lens);
+            Assert.AreNotEqual(a.work, b.work);
+            Assert.AreNotEqual(a.codes, b.codes);
+            Assert.IsTrue(Enumerable.SequenceEqual(a.lens, b.lens));
+            Assert.IsTrue(Enumerable.SequenceEqual(a.work, b.work));
+            Assert.IsTrue(Enumerable.SequenceEqual(a.codes, b.codes));
+            if (a.window == null)
+            {
+                Assert.IsNull(b.window);
+            }
+            else
+            {
+                Assert.IsNotNull(b.window);
+                Assert.AreNotEqual(a.window, b.window);
+            }
+
+            if (a.lencode == a.codes)
+                Assert.AreEqual(b.lencode, b.codes);
+            else
+                Assert.AreEqual(a.lencode, Inflater.s_lenfix);
+
+            if (a.distcode == a.codes)
+                Assert.AreEqual(b.distcode, b.codes);
+            else
+                Assert.AreEqual(a.distcode, Inflater.s_distfix);
+
             Assert.AreEqual(Z_OK, zlib.InflateEnd(ref copy));
             err = 9; // don't care next time around
             have += strm.AvailableIn;
