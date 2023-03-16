@@ -26,23 +26,31 @@ jobs:
           6.0.x
           7.0.x
 
-    - name: Build (.NET 6 & 7)
+    - name: Build for .NET 6 & 7 on macOS and Ubuntu
+      if: ${{ matrix.os != 'windows-latest' }}
       run: |
         dotnet build src/ZLibDotNet/ZLibDotNet.csproj -c Release
         dotnet build tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net6.0
         dotnet build tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net7.0
 
-    - name: Build (.NET Framework 4.6.2)
+    - name: Build for .NET Framework 4.6.2, .NET 6 and .NET 7 on Windows (x86 and x64)
       if: ${{ matrix.os == 'windows-latest' }}
       run: |
-        dotnet build tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net462
+        dotnet build tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -r win-x86 --no-self-contained
+        dotnet build tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -r win-x64 --no-self-contained
 
-    - name: Test (.NET 6 & 7)
+    - name: Test on .NET 6 & 7 on macOS and Ubuntu
+      if: ${{ matrix.os != 'windows-latest' }}
       run: |
         dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net6.0 --no-build --no-restore
         dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net7.0 --no-build --no-restore
 
-    - name: Test (.NET Framework 4.6.2)
+    - name: Test on .NET Framework 4.6.2, .NET 6 and .NET 7 on Windows (x86 and x64)
       if: ${{ matrix.os == 'windows-latest' }}
       run: |
-        dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net462 --no-build --no-restore
+        dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net462 -r win-x86 --no-build --no-restore
+        dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net462 -r win-x64 --no-build --no-restore
+        dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net6.0 -r win-x86 --no-build --no-restore
+        dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net6.0 -r win-x64 --no-build --no-restore
+        dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net7.0 -r win-x86 --no-build --no-restore
+        dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net7.0 -r win-x64 --no-build --no-restore

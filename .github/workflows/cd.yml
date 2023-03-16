@@ -33,7 +33,7 @@ jobs:
         patch=${parts[2]}
         echo ::set-output name=version::$major.$minor.$patch
 
-    - name: Build (.NET 6 & 7)
+    - name: Build for .NET 6 & 7
       shell: bash
       run: |
         version=${{ steps.version.outputs.version }}
@@ -41,18 +41,18 @@ jobs:
         dotnet build tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net6.0 -p:Version=$version
         dotnet build tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net7.0 -p:Version=$version
 
-    - name: Build (.NET Framework 4.6.2)
+    - name: Build for .NET Framework 4.6.2
       if: ${{ matrix.os == 'windows-latest' }}
       shell: bash
       run: |
         dotnet build tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net462 -p:Version=${{ steps.version.outputs.version }}
 
-    - name: Test (.NET 6 & 7)
+    - name: Test on .NET 6 & 7
       run: |
         dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net6.0 --no-build --no-restore
         dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net7.0 --no-build --no-restore
 
-    - name: Test (.NET Framework 4.6.2)
+    - name: Test on .NET Framework 4.6.2
       if: ${{ matrix.os == 'windows-latest' }}
       run: |
         dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net462 --no-build --no-restore
