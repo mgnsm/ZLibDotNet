@@ -7,6 +7,8 @@ on:
 
 jobs:
   Build:
+    permissions:
+      contents: write
     strategy:
       matrix:
         os: [macOS-latest, ubuntu-latest, windows-latest]
