@@ -95,7 +95,7 @@ public ref struct ZStream
     /// <summary>
     /// Gets the total number of input bytes read so far.
     /// </summary>
-    public int TotalIn => (int)total_in;
+    public uint TotalIn => total_in;
 
     /// <summary>
     /// Gets or sets the output buffer.
@@ -153,7 +153,7 @@ public ref struct ZStream
     /// <summary>
     /// Gets the total number of bytes output so far.
     /// </summary>
-    public int TotalOut => (int)total_out;
+    public uint TotalOut => total_out;
 
     /// <summary>
     /// Gets the last error message, or <see langword="null"/> if no error.

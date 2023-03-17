@@ -45,8 +45,8 @@ public class DeflateTests
         byte[] compr = new byte[ComprLen];
         zStream.Output = compr;
 
-        Assert.AreEqual(0, zStream.TotalIn);
-        Assert.AreEqual(0, zStream.TotalOut);
+        Assert.AreEqual(0U, zStream.TotalIn);
+        Assert.AreEqual(0U, zStream.TotalOut);
 
         int count = 0;
         while (zStream.TotalIn != len && zStream.TotalOut < ComprLen)
@@ -57,9 +57,9 @@ public class DeflateTests
         }
         Assert.AreEqual(16, count);
         Assert.AreEqual(0, zStream.AvailableIn);
-        Assert.AreEqual(14, zStream.TotalIn);
+        Assert.AreEqual(14U, zStream.TotalIn);
         Assert.AreEqual(1, zStream.AvailableOut);
-        Assert.AreEqual(2, zStream.TotalOut);
+        Assert.AreEqual(2U, zStream.TotalOut);
         Assert.AreEqual(637928598U, zStream.Adler);
         Assert.AreEqual(2, zStream.DataType);
         Assert.IsNull(zStream.Message);
@@ -79,9 +79,9 @@ public class DeflateTests
         Assert.AreEqual(18, count);
         Assert.AreEqual(Z_OK, zlib.DeflateEnd(ref zStream));
         Assert.AreEqual(0, zStream.AvailableIn);
-        Assert.AreEqual(14, zStream.TotalIn);
+        Assert.AreEqual(14U, zStream.TotalIn);
         Assert.AreEqual(1, zStream.AvailableOut);
-        Assert.AreEqual(19, zStream.TotalOut);
+        Assert.AreEqual(19U, zStream.TotalOut);
         Assert.AreEqual(637928598U, zStream.Adler);
         Assert.AreEqual(0, zStream.DataType);
         Assert.IsNull(zStream.Message);
@@ -109,15 +109,15 @@ public class DeflateTests
         zStream.Input = uncompr;
 
         Assert.AreEqual(40000, zStream.AvailableIn);
-        Assert.AreEqual(0, zStream.TotalIn);
+        Assert.AreEqual(0U, zStream.TotalIn);
         Assert.AreEqual(40000, zStream.AvailableOut);
-        Assert.AreEqual(0, zStream.TotalOut);
+        Assert.AreEqual(0U, zStream.TotalOut);
 
         // At this point, uncompr is still mostly zeroes, so it should compress very well.
         Assert.AreEqual(Z_OK, zlib.Deflate(ref zStream, Z_NO_FLUSH));
         Assert.AreEqual(0, zStream.AvailableIn, "deflate not greedy");
-        Assert.AreEqual(40000, zStream.TotalIn);
-        Assert.AreEqual(2, zStream.TotalOut);
+        Assert.AreEqual(40000U, zStream.TotalIn);
+        Assert.AreEqual(2U, zStream.TotalOut);
         Assert.AreEqual(39998, zStream.AvailableOut);
         Assert.AreEqual(2638611606U, zStream.Adler);
         Assert.AreEqual(2, zStream.DataType);
@@ -129,9 +129,9 @@ public class DeflateTests
         // Feed in already compressed data and switch to no compression.
         Assert.AreEqual(Z_OK, zlib.DeflateParams(ref zStream, Z_NO_COMPRESSION, Z_DEFAULT_STRATEGY));
         Assert.AreEqual(0, zStream.AvailableIn);
-        Assert.AreEqual(40000, zStream.TotalIn);
-        Assert.AreEqual(208, zStream.TotalOut);
-        Assert.AreEqual(40000 - zStream.TotalOut, zStream.AvailableOut);
+        Assert.AreEqual(40000U, zStream.TotalIn);
+        Assert.AreEqual(208U, zStream.TotalOut);
+        Assert.AreEqual(40000 - zStream.TotalOut, (uint)zStream.AvailableOut);
         Assert.AreEqual(2638611606U, zStream.Adler);
         Assert.AreEqual(0, zStream.DataType);
         Assert.IsNull(zStream.Message);
@@ -149,9 +149,9 @@ public class DeflateTests
         zStream.AvailableIn = ComprLen / 2;
         Assert.AreEqual(Z_OK, zlib.Deflate(ref zStream, Z_NO_FLUSH));
         Assert.AreEqual(0, zStream.AvailableIn);
-        Assert.AreEqual(60000, zStream.TotalIn);
-        Assert.AreEqual(208, zStream.TotalOut);
-        Assert.AreEqual(40000 - zStream.TotalOut, zStream.AvailableOut);
+        Assert.AreEqual(60000U, zStream.TotalIn);
+        Assert.AreEqual(208U, zStream.TotalOut);
+        Assert.AreEqual(40000 - zStream.TotalOut, (uint)zStream.AvailableOut);
         Assert.AreEqual(1115171374U, zStream.Adler);
         Assert.AreEqual(0, zStream.DataType);
         Assert.IsNull(zStream.Message);
@@ -160,34 +160,34 @@ public class DeflateTests
         // Switch back to compressing mode.
         Assert.AreEqual(Z_OK, zlib.DeflateParams(ref zStream, Z_BEST_COMPRESSION, Z_FILTERED));
         Assert.AreEqual(0, zStream.AvailableIn);
-        Assert.AreEqual(60000, zStream.TotalIn);
-        Assert.AreEqual(20213, zStream.TotalOut);
-        Assert.AreEqual(40000 - zStream.TotalOut, zStream.AvailableOut);
+        Assert.AreEqual(60000U, zStream.TotalIn);
+        Assert.AreEqual(20213U, zStream.TotalOut);
+        Assert.AreEqual(40000 - zStream.TotalOut, (uint)zStream.AvailableOut);
         Assert.AreEqual(1115171374U, zStream.Adler);
         Assert.AreEqual(0, zStream.DataType);
         Assert.IsNull(zStream.Message);
         Assert.AreEqual(20213, zStream.NextOut);
         byte[] testData = GetCompr();
         byte[] expectedOutput = testData.Take(421).ToArray();
-        VerifyOutput(compr, expectedOutput.Length, expectedOutput);
+        VerifyOutput(compr, (uint)expectedOutput.Length, expectedOutput);
         zStream.Input = uncompr;
         zStream.AvailableIn = UncomprLen;
         Assert.AreEqual(Z_OK, zlib.Deflate(ref zStream, Z_NO_FLUSH));
         Assert.AreEqual(0, zStream.AvailableIn);
-        Assert.AreEqual(100000, zStream.TotalIn);
-        Assert.AreEqual(20213, zStream.TotalOut);
-        Assert.AreEqual(40000 - zStream.TotalOut, zStream.AvailableOut);
+        Assert.AreEqual(100000U, zStream.TotalIn);
+        Assert.AreEqual(20213U, zStream.TotalOut);
+        Assert.AreEqual(40000 - zStream.TotalOut, (uint)zStream.AvailableOut);
         Assert.AreEqual(1497247427U, zStream.Adler);
         Assert.AreEqual(0, zStream.DataType);
         Assert.IsNull(zStream.Message);
         Assert.AreEqual(20213, zStream.NextOut);
-        VerifyOutput(compr, expectedOutput.Length, expectedOutput);
+        VerifyOutput(compr, (uint)expectedOutput.Length, expectedOutput);
 
         Assert.AreEqual(Z_STREAM_END, zlib.Deflate(ref zStream, Z_FINISH), $"deflate should report {Z_STREAM_END}");
         Assert.AreEqual(0, zStream.AvailableIn);
-        Assert.AreEqual(100000, zStream.TotalIn);
-        Assert.AreEqual(20288, zStream.TotalOut);
-        Assert.AreEqual(40000 - zStream.TotalOut, zStream.AvailableOut);
+        Assert.AreEqual(100000U, zStream.TotalIn);
+        Assert.AreEqual(20288U, zStream.TotalOut);
+        Assert.AreEqual(40000U - zStream.TotalOut, (uint)zStream.AvailableOut);
         Assert.AreEqual(1497247427U, zStream.Adler);
         Assert.AreEqual(0, zStream.DataType);
         Assert.IsNull(zStream.Message);
@@ -196,15 +196,15 @@ public class DeflateTests
 
         Assert.AreEqual(Z_OK, zlib.DeflateEnd(ref zStream));
         Assert.AreEqual(0, zStream.AvailableIn);
-        Assert.AreEqual(100000, zStream.TotalIn);
-        Assert.AreEqual(20288, zStream.TotalOut);
-        Assert.AreEqual(40000 - zStream.TotalOut, zStream.AvailableOut);
+        Assert.AreEqual(100000U, zStream.TotalIn);
+        Assert.AreEqual(20288U, zStream.TotalOut);
+        Assert.AreEqual(40000 - zStream.TotalOut, (uint)zStream.AvailableOut);
         Assert.AreEqual(1497247427U, zStream.Adler);
         Assert.AreEqual(0, zStream.DataType);
         Assert.IsNull(zStream.Message);
         Assert.AreEqual(20288, zStream.NextOut);
 
-        static void VerifyOutput(byte[] actualOutput, int count, byte[] expectedOutput)
+        static void VerifyOutput(byte[] actualOutput, uint count, byte[] expectedOutput)
         {
             Assert.IsNotNull(actualOutput);
             Assert.IsNotNull(expectedOutput);
@@ -212,7 +212,7 @@ public class DeflateTests
             for (int i = 0; i < count; i++)
                 Assert.AreEqual(expectedOutput[i], actualOutput[i]);
 
-            for (int i = count; i < actualOutput.Length; i++)
+            for (uint i = count; i < actualOutput.Length; i++)
                 Assert.AreEqual(default, actualOutput[i]);
         }
     }
@@ -231,9 +231,9 @@ public class DeflateTests
         zStream.AvailableOut = ComprLen;
         Assert.AreEqual(Z_OK, zlib.Deflate(ref zStream, Z_FULL_FLUSH));
         Assert.AreEqual(0, zStream.AvailableIn);
-        Assert.AreEqual(3, zStream.TotalIn);
+        Assert.AreEqual(3U, zStream.TotalIn);
         Assert.AreEqual(39989, zStream.AvailableOut);
-        Assert.AreEqual(11, zStream.TotalOut);
+        Assert.AreEqual(11U, zStream.TotalOut);
         Assert.AreEqual(40960314U, zStream.Adler);
         Assert.AreEqual(1, zStream.DataType);
         Assert.IsNull(zStream.Message);
@@ -250,9 +250,9 @@ public class DeflateTests
         if (err != Z_STREAM_END)
             Assert.AreEqual(Z_OK, err);
         Assert.AreEqual(0, zStream.AvailableIn);
-        Assert.AreEqual(14, zStream.TotalIn);
+        Assert.AreEqual(14U, zStream.TotalIn);
         Assert.AreEqual(39972, zStream.AvailableOut);
-        Assert.AreEqual(28, zStream.TotalOut);
+        Assert.AreEqual(28U, zStream.TotalOut);
         Assert.AreEqual(637928598U, zStream.Adler);
         Assert.AreEqual(1, zStream.DataType);
         Assert.IsNull(zStream.Message);
@@ -274,9 +274,9 @@ public class DeflateTests
         byte[] dictionary = Encoding.UTF8.GetBytes($"hello{char.MinValue}");
         Assert.AreEqual(Z_OK, zlib.DeflateSetDictionary(ref zStream, dictionary));
         Assert.AreEqual(0, zStream.AvailableIn);
-        Assert.AreEqual(6, zStream.TotalIn);
+        Assert.AreEqual(6U, zStream.TotalIn);
         Assert.AreEqual(0, zStream.AvailableOut);
-        Assert.AreEqual(0, zStream.TotalOut);
+        Assert.AreEqual(0U, zStream.TotalOut);
         Assert.AreEqual(138478101U, zStream.Adler);
         Assert.AreEqual(2, zStream.DataType);
         Assert.IsNull(zStream.Message);
@@ -290,9 +290,9 @@ public class DeflateTests
 
         Assert.AreEqual(Z_STREAM_END, zlib.Deflate(ref zStream, Z_FINISH), "deflate should report Z_STREAM_END");
         Assert.AreEqual(0, zStream.AvailableIn);
-        Assert.AreEqual(20, zStream.TotalIn);
+        Assert.AreEqual(20U, zStream.TotalIn);
         Assert.AreEqual(39980, zStream.AvailableOut);
-        Assert.AreEqual(20, zStream.TotalOut);
+        Assert.AreEqual(20U, zStream.TotalOut);
         Assert.AreEqual(637928598U, zStream.Adler);
         Assert.AreEqual(0, zStream.DataType);
         Assert.IsNull(zStream.Message);
@@ -375,9 +375,9 @@ public class DeflateTests
         Assert.AreEqual(Z_OK, zlib.DeflateInit(ref zStream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY));
         Assert.AreEqual(Z_OK, zlib.Deflate(ref zStream, Z_FINISH));
         Assert.AreEqual(Z_OK, zlib.DeflateEnd(ref zStream));
-        Assert.AreEqual(13, zStream.TotalOut);
+        Assert.AreEqual(13U, zStream.TotalOut);
 
-        Assert.IsTrue(Enumerable.SequenceEqual(compr.Take(zStream.TotalOut),
+        Assert.IsTrue(Enumerable.SequenceEqual(compr.Take((int)zStream.TotalOut),
             new byte[13] { 203, 72, 205, 201, 201, 215, 81, 200, 0, 81, 138, 12, 0 }));
     }
 }
