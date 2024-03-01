@@ -1,5 +1,5 @@
-﻿// Original code and comments Copyright (C) 1995-2023 Mark Adler
-// Managed C#/.NET code Copyright (C) 2022-2023 Magnus Montin
+﻿// Original code and comments Copyright (C) 1995-2024 Mark Adler
+// Managed C#/.NET code Copyright (C) 2022-2024 Magnus Montin
 
 using System;
 using System.Runtime.InteropServices;
@@ -22,7 +22,7 @@ internal static partial class Inflater
         {
             state.mode = InflateMode.Sync;
             uint temp = state.bits & 7;
-            state.hold <<= (int)temp;
+            state.hold >>= (int)temp;
             state.bits -= temp;
             Span<byte> span = stackalloc byte[4];
             ref byte buf = ref MemoryMarshal.GetReference(span);

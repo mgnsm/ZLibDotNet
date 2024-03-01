@@ -1,5 +1,5 @@
-﻿// Original code and comments Copyright (C) 1995-2005, 2010, 2014, 2016 Jean-loup Gailly, Mark Adler
-// Managed C#/.NET code Copyright (C) 2022-2023 Magnus Montin
+﻿// Original code and comments Copyright (C) 1995-2005, 2014, 2016 Jean-loup Gailly, Mark Adler
+// Managed C#/.NET code Copyright (C) 2022-2024 Magnus Montin
 
 using System;
 using ZLibDotNet.Deflate;

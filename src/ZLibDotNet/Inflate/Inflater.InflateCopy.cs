@@ -1,5 +1,5 @@
-﻿// Original code and comments Copyright (C) 1995 - 2022 Mark Adler
-// Managed C#/.NET code Copyright (C) 2022-2023 Magnus Montin
+﻿// Original code and comments Copyright (C) 1995-2022 Mark Adler
+// Managed C#/.NET code Copyright (C) 2022-2024 Magnus Montin
 
 using System;
 using System.Buffers;

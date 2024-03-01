@@ -1,5 +1,5 @@
-﻿// Original code and comments Copyright (C) 1995-2023 Jean-loup Gailly and Mark Adler
-// Managed C#/.NET code Copyright (C) 2022-2023 Magnus Montin
+﻿// Original code and comments Copyright (C) 1995-2024 Jean-loup Gailly and Mark Adler
+// Managed C#/.NET code Copyright (C) 2022-2024 Magnus Montin
 
 global using static ZLibDotNet.ZLib;
 using System;

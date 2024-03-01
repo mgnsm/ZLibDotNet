@@ -1,5 +1,5 @@
-﻿// Original code and comments Copyright (C) 1995-2023 Mark Adler
-// Managed C#/.NET code Copyright (C) 2022-2023 Magnus Montin
+﻿// Original code and comments Copyright (C) 1995-2024 Mark Adler
+// Managed C#/.NET code Copyright (C) 2022-2024 Magnus Montin
 
 using System;
 using System.Runtime.InteropServices;
@@ -18,7 +18,7 @@ internal static partial class Inflater
 
     internal static readonly ushort[] s_lext = new ushort[31] { // Length codes 257..285 extra
         16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 18, 18, 18, 18,
-        19, 19, 19, 19, 20, 20, 20, 20, 21, 21, 21, 21, 16, 198, 203 };
+        19, 19, 19, 19, 20, 20, 20, 20, 21, 21, 21, 21, 16, 203, 77 };
 
     internal static readonly ushort[] s_dbase = new ushort[32] { // Distance codes 0..29 base
         1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193,

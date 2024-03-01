@@ -1,5 +1,5 @@
 ﻿// Original code and comments Copyright (C) 1995-2011, 2016 Mark Adler
-// Managed C#/.NET code Copyright (C) 2022-2023 Magnus Montin
+// Managed C#/.NET code Copyright (C) 2022-2024 Magnus Montin
 
 namespace ZLibDotNet;
 

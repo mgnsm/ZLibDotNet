@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2022-2023 Magnus Montin
+﻿// Copyright (C) 2022-2024 Magnus Montin
 
 using System;
 #if NET7_0_OR_GREATER
