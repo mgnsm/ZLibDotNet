@@ -1,6 +1,6 @@
 Copyright for the C#/.NET code in this project is held by Magnus Montin.
 
-The implementation is heavily based on version 1.2.13 of the native zlib data compression library (https://zlib.net/) that was written by and for which copyright is held by Jean-loup Gailly and Mark Adler.
+The implementation is heavily based on version 1.3 of the native zlib data compression library (https://zlib.net/) that was written by and for which copyright is held by Jean-loup Gailly and Mark Adler.
 
 Copyright (c) 2022-2023 Magnus Montin
 

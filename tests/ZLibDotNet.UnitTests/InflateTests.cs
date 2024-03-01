@@ -99,31 +99,31 @@ public class InflateTests
         ZLib zlib = new();
         Assert.AreEqual(Z_OK, zlib.InflateInit(ref zStream));
 
-        byte[] uncompr = new byte[ComprLen];
+        byte[] uncompr = new byte[UncomprLen];
         Array.Copy(s_garbage, uncompr, s_garbage.Length);
         int count = 0;
         for (; ; )
         {
             count++;
             zStream.Output = uncompr; // discard the output
-            zStream.AvailableOut = ComprLen;
+            zStream.AvailableOut = UncomprLen;
             int err = zlib.Inflate(ref zStream, Z_NO_FLUSH);
             if (err == Z_STREAM_END)
                 break;
             Assert.AreEqual(Z_OK, err, "large inflate");
         }
         Assert.AreEqual(3, count);
-        Assert.AreEqual(19712, zStream.AvailableIn);
-        Assert.AreEqual(20288U, zStream.TotalIn);
-        Assert.AreEqual(20000, zStream.AvailableOut);
-        Assert.AreEqual(100000U, zStream.TotalOut);
-        Assert.AreEqual(1497247427U, zStream.Adler);
+        Assert.AreEqual(49829, zStream.AvailableIn);
+        Assert.AreEqual(10171U, zStream.TotalIn);
+        Assert.AreEqual(10000, zStream.AvailableOut);
+        Assert.AreEqual(50000U, zStream.TotalOut);
+        Assert.AreEqual(2173379269U, zStream.Adler);
         Assert.AreEqual(64, zStream.DataType);
         Assert.IsNull(zStream.Message);
-        Assert.AreEqual(20288, zStream.NextIn);
+        Assert.AreEqual(10171, zStream.NextIn);
 
         Assert.AreEqual(Z_OK, zlib.InflateEnd(ref zStream));
-        Assert.AreEqual(zStream.TotalOut, 2U * ComprLen + ComprLen / 2);
+        Assert.AreEqual(zStream.TotalOut, 2U * UncomprLen + UncomprLen / 2);
     }
 
     [TestMethod]
@@ -151,7 +151,7 @@ public class InflateTests
         Assert.AreEqual(Z_OK, zlib.Inflate(ref zStream, Z_NO_FLUSH));
         Assert.AreEqual(0, zStream.AvailableIn);
         Assert.AreEqual(2U, zStream.TotalIn);
-        Assert.AreEqual(40000, zStream.AvailableOut);
+        Assert.AreEqual(UncomprLen, zStream.AvailableOut);
         Assert.AreEqual(0U, zStream.TotalOut);
         Assert.AreEqual(1U, zStream.Adler);
         Assert.AreEqual(128, zStream.DataType);
@@ -163,7 +163,7 @@ public class InflateTests
         Assert.AreEqual(Z_OK, zlib.InflateSync(ref zStream));  // but skip the damaged part
         Assert.AreEqual(17, zStream.AvailableIn);
         Assert.AreEqual(11U, zStream.TotalIn);
-        Assert.AreEqual(40000, zStream.AvailableOut);
+        Assert.AreEqual(UncomprLen, zStream.AvailableOut);
         Assert.AreEqual(0U, zStream.TotalOut);
         Assert.AreEqual(1U, zStream.Adler);
         Assert.AreEqual(128, zStream.DataType);
@@ -174,7 +174,7 @@ public class InflateTests
         Assert.AreEqual(Z_STREAM_END, zlib.Inflate(ref zStream, Z_FINISH), $"inflate should report {Z_STREAM_END}");
         Assert.AreEqual(0, zStream.AvailableIn);
         Assert.AreEqual(28U, zStream.TotalIn);
-        Assert.AreEqual(39989, zStream.AvailableOut);
+        Assert.AreEqual(UncomprLen - 11, zStream.AvailableOut);
         Assert.AreEqual(11U, zStream.TotalOut);
         Assert.AreEqual(1U, zStream.Adler);
         Assert.AreEqual(64, zStream.DataType);
@@ -195,16 +195,16 @@ public class InflateTests
         Array.Copy(new byte[20] { 120, 249, 8, 65, 2, 21, 203, 0, 145, 58, 10, 96, 74, 145, 1, 0, 38, 6, 4, 150 },
             compr, 20);
         zStream.Input = compr;
-        zStream.AvailableIn = compr.Length;
+        zStream.AvailableIn = ComprLen;
 
         ZLib zlib = new();
         Assert.AreEqual(Z_OK, zlib.InflateInit(ref zStream));
 
-        byte[] uncompr = new byte[ComprLen];
+        byte[] uncompr = new byte[UncomprLen];
         Array.Copy(s_garbage, uncompr, s_garbage.Length);
 
         zStream.Output = uncompr;
-        zStream.AvailableOut = uncompr.Length;
+        zStream.AvailableOut = UncomprLen;
 
         byte[] dictionary = Encoding.UTF8.GetBytes($"hello{char.MinValue}");
         for (; ; )
@@ -219,9 +219,9 @@ public class InflateTests
             }
             Assert.AreEqual(Z_OK, err, "inflate with dict");
         }
-        Assert.AreEqual(39980, zStream.AvailableIn);
+        Assert.AreEqual(ComprLen - 20, zStream.AvailableIn);
         Assert.AreEqual(14U, zStream.TotalIn);
-        Assert.AreEqual(39986, zStream.AvailableOut);
+        Assert.AreEqual(UncomprLen - 14, zStream.AvailableOut);
         Assert.AreEqual(14U, zStream.TotalOut);
         Assert.AreEqual(637928598U, zStream.Adler);
         Assert.AreEqual(64, zStream.DataType);

@@ -10,6 +10,9 @@ internal static partial class Inflater
         if (InflateStateCheck(ref strm))
             return Z_STREAM_ERROR;
 
+        if (bits == 0)
+            return Z_OK;
+
         InflateState state = strm.inflateState;
         if (bits < 0)
         {
