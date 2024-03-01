@@ -1,5 +1,5 @@
-﻿// Original code and comments Copyright (C) 1995-2023 Jean-loup Gailly and Mark Adler
-// Managed C#/.NET code Copyright (C) 2022-2023 Magnus Montin
+﻿// Original code and comments Copyright (C) 1995-2024 Jean-loup Gailly and Mark Adler
+// Managed C#/.NET code Copyright (C) 2022-2024 Magnus Montin
 
 using System;
 using System.Diagnostics;
@@ -402,7 +402,7 @@ internal static partial class Deflater
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int ReturnWithError(ref ZStream strm, int err)
     {
-        strm.msg = s_z_errmsg[Z_NEED_DICT - err];
+        strm.msg = s_z_errmsg[err < -6 || err > 2 ? 9 : 2 - err];
         return err;
     }
 
