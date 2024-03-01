@@ -13,7 +13,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BenchmarkDotNet" Version="0.13.5" />
+    <PackageReference Include="BenchmarkDotNet" Version="0.13.12" />
     <PackageReference Include="DotNetZip" Version="1.16.0" />
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
     <PackageReference Include="zlib.managed" Version="1.1.5-preview-99682104" />
