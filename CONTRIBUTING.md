@@ -19,7 +19,7 @@ Follow these steps when contributing code to this repository:
 
     The [.editorconfig](.editorconfig) file defines the code style. Do not edit this one or the [project file](https://github.com/mgnsm/ZLibDotNet/blob/main/src/ZLibDotNet/ZLibDotNet.csproj) unless these files are directly related to your changes.
 
-5. Build and test the code in both debug and release mode using the [.NET 7 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/7.0):
+5. Build and test the code in both debug and release mode using the [.NET 8 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/8.0):
 
         dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c release
 

@@ -17,12 +17,11 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
 
-    - name: Setup the .NET 6 & 7 SDK
+    - name: Setup the .NET 8 SDK
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
-          6.0.x
-          7.0.x
+          8.0.x
 
     - name: Get Version From Tag
       id: version
@@ -35,13 +34,12 @@ jobs:
         patch=${parts[2]}
         echo ::set-output name=version::$major.$minor.$patch
 
-    - name: Build for .NET 6 & 7
+    - name: Build for .NET 8
       shell: bash
       run: |
         version=${{ steps.version.outputs.version }}
         dotnet build src/ZLibDotNet/ZLibDotNet.csproj -c Release -p:Version=$version -p:ContinuousIntegrationBuild=true
-        dotnet build tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net6.0 -p:Version=$version
-        dotnet build tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net7.0 -p:Version=$version
+        dotnet build tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net8.0 -p:Version=$version
 
     - name: Build for .NET Framework 4.6.2
       if: ${{ matrix.os == 'windows-latest' }}
@@ -49,10 +47,9 @@ jobs:
       run: |
         dotnet build tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net462 -p:Version=${{ steps.version.outputs.version }}
 
-    - name: Test on .NET 6 & 7
+    - name: Test on .NET 8
       run: |
-        dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net6.0 --no-build --no-restore
-        dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net7.0 --no-build --no-restore
+        dotnet test tests/ZLibDotNet.UnitTests/ZLibDotNet.UnitTests.csproj -c Release -f net8.0 --no-build --no-restore
 
     - name: Test on .NET Framework 4.6.2
       if: ${{ matrix.os == 'windows-latest' }}
