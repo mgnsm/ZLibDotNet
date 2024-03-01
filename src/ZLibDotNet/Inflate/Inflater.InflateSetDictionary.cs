@@ -1,4 +1,4 @@
-﻿// Original code and comments Copyright (C) 1995-2022 Mark Adler
+﻿// Original code and comments Copyright (C) 1995-2023 Mark Adler
 // Managed C#/.NET code Copyright (C) 2022-2023 Magnus Montin
 
 using System;
