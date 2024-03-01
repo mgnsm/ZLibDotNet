@@ -48,16 +48,16 @@ internal static partial class Deflater
 
     internal static readonly Config[] s_configuration_table = new Config[10]
     {
-        new Config(0, 0, 0, 0, Config.DeflateType.Stored),          // 0: store only
-        new Config(4, 4, 8, 4, Config.DeflateType.Fast),            // 1: max speed, no lazy matches
-        new Config(4, 5, 16, 8, Config.DeflateType.Fast),           // 2
-        new Config(4, 6, 32, 32, Config.DeflateType.Fast),          // 3
-        new Config(4, 4, 16, 16, Config.DeflateType.Slow),          // 4: lazy matches
-        new Config(8, 16, 32, 32, Config.DeflateType.Slow),         // 5
-        new Config(8, 16, 128, 128, Config.DeflateType.Slow),       // 6
-        new Config(8, 32, 128, 256, Config.DeflateType.Slow),       // 7
-        new Config(32, 128, 258, 1024, Config.DeflateType.Slow),    // 8
-        new Config(32, 258, 258, 4096, Config.DeflateType.Slow)     // 9: max compression
+        new(0, 0, 0, 0, Config.DeflateType.Stored),          // 0: store only
+        new(4, 4, 8, 4, Config.DeflateType.Fast),            // 1: max speed, no lazy matches
+        new(4, 5, 16, 8, Config.DeflateType.Fast),           // 2
+        new(4, 6, 32, 32, Config.DeflateType.Fast),          // 3
+        new(4, 4, 16, 16, Config.DeflateType.Slow),          // 4: lazy matches
+        new(8, 16, 32, 32, Config.DeflateType.Slow),         // 5
+        new(8, 16, 128, 128, Config.DeflateType.Slow),       // 6
+        new(8, 32, 128, 256, Config.DeflateType.Slow),       // 7
+        new(32, 128, 258, 1024, Config.DeflateType.Slow),    // 8
+        new(32, 258, 258, 4096, Config.DeflateType.Slow)     // 9: max compression
     };
 
     private static readonly int[] s_base_dist = new int[DCodes] {
