@@ -47,7 +47,7 @@ public ref struct ZStream
     /// <remarks>Setting the <see cref="Input"/> property resets the <see cref="AvailableIn"/> and <see cref="NextIn"/> properties to their default values.</remarks>
     public ReadOnlySpan<byte> Input
     {
-        get => _input;
+        readonly get => _input;
         set
         {
             _input = value;
@@ -67,7 +67,7 @@ public ref struct ZStream
     /// <remarks>If you choose to set this optional property, you should set it after you have set the <see cref="Input"/> property.</remarks>
     public int AvailableIn
     {
-        get => (int)avail_in;
+        readonly get => (int)avail_in;
         set
         {
             ValidateAvailableBytes(value, next_in, _input, nameof(Input), nameof(NextIn));
@@ -84,7 +84,7 @@ public ref struct ZStream
     /// <remarks>If you choose to set this optional property, you should set it after you have set the <see cref="Input"/> property.</remarks>
     public int NextIn
     {
-        get => (int)next_in;
+        readonly get => (int)next_in;
         set
         {
             ValidateOffset(value, AvailableIn, _input, nameof(Input));
@@ -95,7 +95,7 @@ public ref struct ZStream
     /// <summary>
     /// Gets the total number of input bytes read so far.
     /// </summary>
-    public uint TotalIn => total_in;
+    public readonly uint TotalIn => total_in;
 
     /// <summary>
     /// Gets or sets the output buffer.
@@ -105,7 +105,7 @@ public ref struct ZStream
     public Span<byte> Output
 #pragma warning restore CA1819
     {
-        get => _output;
+        readonly get => _output;
         set
         {
             _output = value;
@@ -125,7 +125,7 @@ public ref struct ZStream
     /// <remarks>If you choose to set this optional property, you should set it after you have set the <see cref="Output"/> property.</remarks>
     public int AvailableOut
     {
-        get => (int)avail_out;
+        readonly get => (int)avail_out;
         set
         {
             ValidateAvailableBytes(value, next_out, _output, nameof(Output), nameof(NextOut));
@@ -142,7 +142,7 @@ public ref struct ZStream
     /// <remarks>If you choose to set this optional property, you should set it after you have set the <see cref="Output"/> property.</remarks>
     public int NextOut
     {
-        get => (int)next_out;
+        readonly get => (int)next_out;
         set
         {
             ValidateOffset(value, AvailableOut, _output, nameof(Output));
@@ -153,17 +153,17 @@ public ref struct ZStream
     /// <summary>
     /// Gets the total number of bytes output so far.
     /// </summary>
-    public uint TotalOut => total_out;
+    public readonly uint TotalOut => total_out;
 
     /// <summary>
     /// Gets the last error message, or <see langword="null"/> if no error.
     /// </summary>
-    public string Message => msg;
+    public readonly string Message => msg;
 
     /// <summary>
     /// Gets a value that represents a best guess about the data type: binary or text for deflate, or the decoding state for inflate.
     /// </summary>
-    public int DataType => data_type;
+    public readonly int DataType => data_type;
 
     /// <summary>
     /// Gets the Adler-32 value of the uncompressed data.
