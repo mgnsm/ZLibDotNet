@@ -1544,8 +1544,8 @@ internal static partial class Deflater
     {
         uint chain_length = s.max_chain_length; // max hash chain length
         ref byte scan = ref Unsafe.Add(ref window, s.strstart); // current string
-        uint len;                               // length of current match
-        uint best_len = s.prev_length;          // best match length so far
+        int len;                                // length of current match
+        int best_len = (int)s.prev_length;      // best match length so far
         int nice_match = s.nice_match;          // stop if match long enough
         uint limit = s.strstart > MaxDist(s) ? s.strstart - MaxDist(s) : 0;
         /* Stop when cur_match becomes <= limit. To simplify the code,
@@ -1621,7 +1621,7 @@ internal static partial class Deflater
 
             Debug.Assert(scan <= window + (s.window_size - 1), "wild scan");
 
-            len = MaxMatch - (uint)netUnsafe.ByteOffset(ref scan, ref strend);
+            len = MaxMatch - (int)netUnsafe.ByteOffset(ref scan, ref strend);
             scan = ref Unsafe.Subtract(ref strend, (uint)MaxMatch);
 
             if (len > best_len)
@@ -1636,7 +1636,7 @@ internal static partial class Deflater
         } while ((cur_match = Unsafe.Add(ref prev, cur_match & wmask)) > limit && --chain_length != 0);
 
         if (best_len <= s.lookahead)
-            return best_len;
+            return (uint)best_len;
 
         return s.lookahead;
     }
