@@ -2,7 +2,7 @@
 ![Build Status](https://github.com/mgnsm/ZLibDotNet/actions/workflows/ci.yml/badge.svg)
 [![NuGet Badge](https://img.shields.io/nuget/v/ZLibDotNet.svg)](https://www.nuget.org/packages/ZLibDotNet/)
 
-A fully managed and [performant](tests/ZLibDotNet.Benchmarks) C#/.NET Standard 1.3 compatible implementation of the [zlib compression library](https://www.zlib.net/) which provides in-memory compression, decompression, and integrity checks of uncompressed data in the zlib ([RFC (Request for Comments) 1950](https://datatracker.ietf.org/doc/html/rfc1950)) and raw deflate ([RFC 1951](https://datatracker.ietf.org/doc/html/rfc1951)) data formats (but not the gzip or zip formats).
+A fully managed, [performant](tests/ZLibDotNet.Benchmarks) and modern C# (.NET Standard 1.3 compatible) implementation of the [zlib compression library](https://www.zlib.net/) which provides in-memory compression, decompression, and integrity checks of uncompressed data in the zlib ([RFC (Request for Comments) 1950](https://datatracker.ietf.org/doc/html/rfc1950)) and raw deflate ([RFC 1951](https://datatracker.ietf.org/doc/html/rfc1951)) data formats (but not the gzip or zip formats).
 
 ## zlib support in .NET
 If you simply want to compress or decompress data in the zlib format in a .NET application, there is a `ZLibStream` class for doing this in .NET 6 and later versions:
@@ -64,7 +64,7 @@ Debug.Assert(MemoryExtensions.SequenceEqual(inputData, uncomressedData));
 ```
 Check out the [unit tests](https://github.com/mgnsm/ZLibDotNet/tree/main/tests/ZLibDotNet.UnitTests) for more examples.
 ### Implementation
-`ZStream` has been named after the equivalent `z_stream` type in the ported library. It breaks the [CA1711](https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/quality-rules/ca1711) naming rule as it's not a `System.IO.Stream` but a `ref struct`. 
+`ZStream` has been named after the equivalent `z_stream` type in the ported library. It intentionally breaks the [CA1711](https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/quality-rules/ca1711) naming rule as it's not a `System.IO.Stream` but a `ref struct`. 
 
 `Input` is a `ReadOnlySpan<byte>` property that defines the input buffer of the data to be compressed or uncompressed. The optional `int` properties `NextIn` and `AvailableIn` can be used to specify a starting position in the buffer and the maximum number of bytes to consume from it respectively.
 
